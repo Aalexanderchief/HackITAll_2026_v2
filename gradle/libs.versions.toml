@@ -11,6 +11,10 @@ camerax = "1.4.0"
 mlkit-barcode = "17.3.0"
 activity-compose = "1.9.3"
 lifecycle-runtime-compose = "2.8.5"
+zxing = "3.5.3"
+intellij-platform = "2.3.0"
+navigation-compose = "2.8.5"
+lifecycle = "2.8.7"
 
 [libraries]
 # Ktor
@@ -39,6 +43,20 @@ camerax-view                = { module = "androidx.camera:camera-view",         
 mlkit-barcode               = { module = "com.google.mlkit:barcode-scanning",         version.ref = "mlkit-barcode" }
 activity-compose            = { module = "androidx.activity:activity-compose",        version.ref = "activity-compose" }
 lifecycle-runtime-compose   = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle-runtime-compose" }
+# Ktor server (plugin only)
+ktor-server-netty        = { module = "io.ktor:ktor-server-netty",                   version.ref = "ktor" }
+ktor-server-websockets   = { module = "io.ktor:ktor-server-websockets",              version.ref = "ktor" }
+ktor-server-content-neg  = { module = "io.ktor:ktor-server-content-negotiation",     version.ref = "ktor" }
+
+# QR code
+zxing-core   = { module = "com.google.zxing:core",     version.ref = "zxing" }
+zxing-javase = { module = "com.google.zxing:javase",   version.ref = "zxing" }
+# Navigation
+navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
+
+# Lifecycle
+lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 
 [plugins]
 kotlin-multiplatform  = { id = "org.jetbrains.kotlin.multiplatform",          version.ref = "kotlin" }
@@ -47,3 +65,5 @@ compose-multiplatform = { id = "org.jetbrains.compose",                        v
 compose-compiler      = { id = "org.jetbrains.kotlin.plugin.compose",          version.ref = "kotlin" }
 android-application   = { id = "com.android.application",                      version.ref = "agp" }
 android-library       = { id = "com.android.library",                          version.ref = "agp" }
+kotlin-jvm            = { id = "org.jetbrains.kotlin.jvm",                      version.ref = "kotlin" }
+intellij-platform = { id = "org.jetbrains.intellij.platform", version.ref = "intellij-platform" }

@@ -7,6 +7,7 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         google()
         mavenCentral()
@@ -14,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "AgentPilot"
-include(":shared", ":androidApp")
+include(":shared", ":androidApp", ":intellijPlugin")
