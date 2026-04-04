@@ -9,7 +9,8 @@
         android:name=".AgentPilotApplication"
         android:label="AgentPilot"
         android:theme="@style/Theme.AgentPilot"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
