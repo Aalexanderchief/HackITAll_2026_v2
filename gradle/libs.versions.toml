@@ -7,6 +7,8 @@ coroutines = "1.10.0"
 serialization = "1.8.0"
 mcp-kotlin-sdk = "0.9.0"
 datetime = "0.6.1"
+navigation-compose = "2.8.5"
+lifecycle = "2.8.7"
 
 [libraries]
 # Ktor
@@ -26,6 +28,13 @@ serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-jso
 # MCP
 mcp-kotlin-sdk = { module = "io.modelcontextprotocol:kotlin-sdk", version.ref = "mcp-kotlin-sdk" }
 datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
+
+# Navigation
+navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
+
+# Lifecycle
+lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 
 [plugins]
 kotlin-multiplatform  = { id = "org.jetbrains.kotlin.multiplatform",          version.ref = "kotlin" }
