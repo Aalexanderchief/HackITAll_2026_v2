@@ -7,6 +7,8 @@ coroutines = "1.10.0"
 serialization = "1.8.0"
 mcp-kotlin-sdk = "0.9.0"
 datetime = "0.6.1"
+zxing = "3.5.3"
+intellij-platform = "2.3.0"
 
 [libraries]
 # Ktor
@@ -27,6 +29,15 @@ serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-jso
 mcp-kotlin-sdk = { module = "io.modelcontextprotocol:kotlin-sdk", version.ref = "mcp-kotlin-sdk" }
 datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
 
+# Ktor server (plugin only)
+ktor-server-netty        = { module = "io.ktor:ktor-server-netty",                   version.ref = "ktor" }
+ktor-server-websockets   = { module = "io.ktor:ktor-server-websockets",              version.ref = "ktor" }
+ktor-server-content-neg  = { module = "io.ktor:ktor-server-content-negotiation",     version.ref = "ktor" }
+
+# QR code
+zxing-core   = { module = "com.google.zxing:core",     version.ref = "zxing" }
+zxing-javase = { module = "com.google.zxing:javase",   version.ref = "zxing" }
+
 [plugins]
 kotlin-multiplatform  = { id = "org.jetbrains.kotlin.multiplatform",          version.ref = "kotlin" }
 kotlin-serialization  = { id = "org.jetbrains.kotlin.plugin.serialization",   version.ref = "kotlin" }
@@ -34,3 +45,5 @@ compose-multiplatform = { id = "org.jetbrains.compose",                        v
 compose-compiler      = { id = "org.jetbrains.kotlin.plugin.compose",          version.ref = "kotlin" }
 android-application   = { id = "com.android.application",                      version.ref = "agp" }
 android-library       = { id = "com.android.library",                          version.ref = "agp" }
+kotlin-jvm            = { id = "org.jetbrains.kotlin.jvm",                      version.ref = "kotlin" }
+intellij-platform = { id = "org.jetbrains.intellij.platform", version.ref = "intellij-platform" }
