@@ -8,7 +8,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
-import kotlinx.serialization.json.JsonObject
 import java.awt.*
 import java.awt.image.BufferedImage
 import java.net.Inet4Address
@@ -60,8 +59,8 @@ class AgentPilotToolWindow : ToolWindowFactory, DumbAware {
 
         val testButton = JButton("Send test event").apply {
             addActionListener {
-                WebSocketServer.broadcast("test/ping", JsonObject(emptyMap()))
-                appendLog("test/ping → broadcast to ${if (WebSocketServer.isRunning) "running" else "stopped"}")
+                AgentEventBus.emit(AgentEvent.McpToolCall("test/ping"))
+                appendLog("test/ping → emitted to bus (server: ${if (WebSocketServer.isRunning) "running" else "stopped"})")
             }
         }
 
