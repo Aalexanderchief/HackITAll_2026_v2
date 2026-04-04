@@ -18,7 +18,7 @@ class LlmActionInterceptor : AnActionListener {
     )
 
     override fun beforeActionPerformed(action: AnAction, event: AnActionEvent) {
-        val actionId = event.actionManager.getId(action) ?: return
+        val actionId = event.actionManager?.getId(action) ?: return
         if (aiActionPrefixes.none { actionId.startsWith(it) }) return
 
         val editor = event.getData(CommonDataKeys.EDITOR) ?: return
