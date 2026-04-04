@@ -42,6 +42,7 @@ object WebSocketServer {
             }
         }
         scope.launch { server!!.start(wait = false) }
+        scope.launch { collectEvents() }
     }
 
     fun stop() {
@@ -64,6 +65,16 @@ object WebSocketServer {
         scope.launch {
             sessions.values.toList().forEach { session ->
                 runCatching { session.send(Frame.Text(text)) }
+            }
+        }
+    }
+
+    private suspend fun collectEvents() {
+        AgentEventBus.events.collect { event ->
+            when (event) {
+                is AgentEvent.McpToolCall -> broadcast(event.endpoint, event.content)
+                is AgentEvent.LlmRequest  -> broadcast("llm/request",  Json.encodeToJsonElement(event))
+                is AgentEvent.IdeSignal   -> broadcast("ide/signal",   Json.encodeToJsonElement(event))
             }
         }
     }
