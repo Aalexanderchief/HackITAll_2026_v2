@@ -9,6 +9,8 @@ mcp-kotlin-sdk = "0.9.0"
 datetime = "0.6.1"
 zxing = "3.5.3"
 intellij-platform = "2.3.0"
+navigation-compose = "2.8.5"
+lifecycle = "2.8.7"
 
 [libraries]
 # Ktor
@@ -37,6 +39,12 @@ ktor-server-content-neg  = { module = "io.ktor:ktor-server-content-negotiation",
 # QR code
 zxing-core   = { module = "com.google.zxing:core",     version.ref = "zxing" }
 zxing-javase = { module = "com.google.zxing:javase",   version.ref = "zxing" }
+# Navigation
+navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
+
+# Lifecycle
+lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 
 [plugins]
 kotlin-multiplatform  = { id = "org.jetbrains.kotlin.multiplatform",          version.ref = "kotlin" }

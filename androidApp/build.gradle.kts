@@ -12,7 +12,24 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(project(":shared"))
+
+            // Compose
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
+            implementation(compose.ui)
+            implementation(compose.uiTooling)
             implementation(compose.preview)
+
+            // Navigation
+            implementation(libs.navigation.compose)
+
+            // Lifecycle
+            implementation(libs.lifecycle.viewmodel.compose)
+            implementation(libs.lifecycle.runtime.compose)
+
+            // Coroutines
             implementation(libs.coroutines.android)
         }
     }
