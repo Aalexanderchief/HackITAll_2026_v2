@@ -1,7 +1,7 @@
 [versions]
 kotlin = "2.3.0"
 compose-multiplatform = "1.10.0"
-agp = "8.7.0"
+agp = "8.6.0"
 ktor = "3.4.0"
 coroutines = "1.10.0"
 serialization = "1.8.0"
@@ -55,7 +55,6 @@ navigation-compose = { module = "androidx.navigation:navigation-compose", versio
 
 # Lifecycle
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 
 [plugins]
 kotlin-multiplatform  = { id = "org.jetbrains.kotlin.multiplatform",          version.ref = "kotlin" }

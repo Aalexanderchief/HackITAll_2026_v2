@@ -9,6 +9,8 @@ import io.ktor.websocket.DefaultWebSocketSession
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
+import io.ktor.websocket.send
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +63,7 @@ class WebSocketClient {
             var backoffMs = 1_000L
             while (true) {
                 try {
+                    println("[AgentPilot] Connecting to $url ...")
                     _state.value = ConnectionState.Connecting
                     httpClient.webSocket(url) {
                         activeSession = this
@@ -73,6 +76,7 @@ class WebSocketClient {
                     break
                 } catch (e: Exception) {
                     activeSession = null
+                    println("[AgentPilot] WebSocket connection failed: ${e::class.simpleName}: ${e.message}")
                     _state.value = ConnectionState.Failed(e)
                     delay(backoffMs)
                     backoffMs = (backoffMs * 2).coerceAtMost(30_000L)
@@ -120,17 +124,25 @@ class WebSocketClient {
             version = "1.0",
             capabilities = listOf("clarification", "code-review")
         )
+        println("[AgentPilot] Sending handshake...")
         send(Frame.Text(json.encodeToString<AgentMessage>(handshake)))
 
         // Wait for the server's echo
         for (frame in incoming) {
             if (frame !is Frame.Text) continue
-            val msg = runCatching { json.decodeFromString<AgentMessage>(frame.readText()) }.getOrNull()
+            val text = frame.readText()
+            println("[AgentPilot] Received frame: $text")
+            val msg = runCatching { json.decodeFromString<AgentMessage>(text) }.getOrElse {
+                println("[AgentPilot] Failed to decode frame: ${it.message}")
+                null
+            }
             if (msg is AgentMessage.ConnectionHandshake) {
+                println("[AgentPilot] Handshake complete, version=${msg.version}")
                 _state.value = ConnectionState.Connected(msg.version)
                 return
             }
         }
+        println("[AgentPilot] Handshake loop ended without success")
     }
 
     private suspend fun DefaultWebSocketSession.receiveLoop() {
