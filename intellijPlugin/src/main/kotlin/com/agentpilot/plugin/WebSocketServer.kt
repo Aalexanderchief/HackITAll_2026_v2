@@ -38,8 +38,13 @@ object WebSocketServer {
                     sessions[id] = this
                     try {
                         for (frame in incoming) {
-                            if (frame is Frame.Text && frame.readText().contains("\"connection_handshake\"")) {
-                                send(Frame.Text("""{"type":"connection_handshake","version":"1.0","capabilities":["clarification","code-review"]}"""))
+                            if (frame !is Frame.Text) continue
+                            val text = frame.readText()
+                            when {
+                                text.contains("\"connection_handshake\"") ->
+                                    send(Frame.Text("""{"type":"connection_handshake","version":"1.0","capabilities":["clarification","code-review"]}"""))
+                                text.contains("\"clarification_response\"") ->
+                                    handleClarificationResponse(text)
                             }
                         }
                     } finally {
@@ -101,6 +106,32 @@ object WebSocketServer {
                     broadcastAgentStatus("agent-pilot", event.type, event.detail)
                 }
             }
+        }
+    }
+
+    fun broadcastClarificationRequest(id: String, question: String, context: String) {
+        val msg = buildJsonObject {
+            put("type", "clarification_request")
+            put("id", id)
+            put("question", question)
+            put("context", context)
+        }
+        val text = Json.encodeToString(msg)
+        scope.launch {
+            sessions.values.toList().forEach { session ->
+                runCatching { session.send(Frame.Text(text)) }
+            }
+        }
+    }
+
+    private fun handleClarificationResponse(text: String) {
+        try {
+            val obj = Json.parseToJsonElement(text).jsonObject
+            val id = obj["id"]?.jsonPrimitive?.content ?: return
+            val answer = obj["answer"]?.jsonPrimitive?.content ?: return
+            SidecarBridge.resolveApproval(id, answer == "approved")
+        } catch (e: Exception) {
+            System.err.println("[AgentPilot] Failed to parse clarification response: ${e.message}")
         }
     }
 

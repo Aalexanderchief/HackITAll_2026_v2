@@ -24,6 +24,16 @@ fun AgentListScreen(
     val agents by viewModel.filteredAgents.collectAsState()
     val filterStatus by viewModel.filterStatus.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
+    val activeClarification by viewModel.activeClarification.collectAsState()
+
+    activeClarification?.let { request ->
+        ApprovalDialog(
+            toolName = request.question,
+            context = request.context,
+            onApprove = { viewModel.respondToClarification(request.id, approved = true) },
+            onReject  = { viewModel.respondToClarification(request.id, approved = false) }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -164,6 +174,32 @@ private fun StatusFilterRow(
             )
         }
     }
+}
+
+@Composable
+private fun ApprovalDialog(
+    toolName: String,
+    context: String,
+    onApprove: () -> Unit,
+    onReject: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onReject,
+        title = { Text(toolName, style = MaterialTheme.typography.titleMedium) },
+        text  = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Claude Code wants to run:", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(context, style = MaterialTheme.typography.bodyMedium)
+            }
+        },
+        confirmButton = {
+            Button(onClick = onApprove) { Text("Approve") }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onReject) { Text("Reject") }
+        }
+    )
 }
 
 @Composable

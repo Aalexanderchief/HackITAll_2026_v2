@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.agentpilot.android.AgentPilotApplication
 import com.agentpilot.shared.models.AgentMessage
 import com.agentpilot.shared.models.AgentStatus
+import com.agentpilot.shared.models.InputSource
 import com.agentpilot.shared.network.ConnectionState
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 
 class AgentListViewModel : ViewModel() {
 
@@ -36,6 +38,9 @@ class AgentListViewModel : ViewModel() {
         initialValue = emptyList()
     )
 
+    val activeClarification: StateFlow<AgentMessage.ClarificationRequest?> =
+        connectionViewModel.activeClarification
+
     fun connectViaIp(ip: String) = connectionViewModel.connectViaIp(ip)
 
     fun disconnect() = connectionViewModel.disconnect()
@@ -43,6 +48,18 @@ class AgentListViewModel : ViewModel() {
     fun setFilter(status: AgentStatus?) { _filterStatus.value = status }
 
     fun clearFilter() { _filterStatus.value = null }
+
+    fun respondToClarification(id: String, approved: Boolean) {
+        viewModelScope.launch {
+            connectionViewModel.send(
+                AgentMessage.ClarificationResponse(
+                    id = id,
+                    answer = if (approved) "approved" else "rejected",
+                    source = InputSource.TEXT
+                )
+            )
+        }
+    }
 
     override fun onCleared() {
         super.onCleared()
