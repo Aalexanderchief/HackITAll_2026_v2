@@ -7,6 +7,14 @@ coroutines = "1.10.0"
 serialization = "1.8.0"
 mcp-kotlin-sdk = "0.9.0"
 datetime = "0.6.1"
+camerax = "1.4.0"
+mlkit-barcode = "17.3.0"
+activity-compose = "1.9.3"
+lifecycle-runtime-compose = "2.8.5"
+zxing = "3.5.3"
+intellij-platform = "2.3.0"
+navigation-compose = "2.8.5"
+lifecycle = "2.8.7"
 
 [libraries]
 # Ktor
@@ -15,6 +23,7 @@ ktor-client-okhttp          = { module = "io.ktor:ktor-client-okhttp",          
 ktor-client-websockets      = { module = "io.ktor:ktor-client-websockets",               version.ref = "ktor" }
 ktor-client-content-neg     = { module = "io.ktor:ktor-client-content-negotiation",      version.ref = "ktor" }
 ktor-serialization-json     = { module = "io.ktor:ktor-serialization-kotlinx-json",      version.ref = "ktor" }
+ktor-network                = { module = "io.ktor:ktor-network",                          version.ref = "ktor" }
 
 # Coroutines
 coroutines-core    = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",    version.ref = "coroutines" }
@@ -27,6 +36,28 @@ serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-jso
 mcp-kotlin-sdk = { module = "io.modelcontextprotocol:kotlin-sdk", version.ref = "mcp-kotlin-sdk" }
 datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
 
+# CameraX + QR scanning (androidMain only)
+camerax-camera2             = { module = "androidx.camera:camera-camera2",           version.ref = "camerax" }
+camerax-lifecycle           = { module = "androidx.camera:camera-lifecycle",          version.ref = "camerax" }
+camerax-view                = { module = "androidx.camera:camera-view",               version.ref = "camerax" }
+mlkit-barcode               = { module = "com.google.mlkit:barcode-scanning",         version.ref = "mlkit-barcode" }
+activity-compose            = { module = "androidx.activity:activity-compose",        version.ref = "activity-compose" }
+lifecycle-runtime-compose   = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle-runtime-compose" }
+# Ktor server (plugin only)
+ktor-server-netty        = { module = "io.ktor:ktor-server-netty",                   version.ref = "ktor" }
+ktor-server-websockets   = { module = "io.ktor:ktor-server-websockets",              version.ref = "ktor" }
+ktor-server-content-neg  = { module = "io.ktor:ktor-server-content-negotiation",     version.ref = "ktor" }
+
+# QR code
+zxing-core   = { module = "com.google.zxing:core",     version.ref = "zxing" }
+zxing-javase = { module = "com.google.zxing:javase",   version.ref = "zxing" }
+# Navigation
+navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
+
+# Lifecycle
+lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+
 [plugins]
 kotlin-multiplatform  = { id = "org.jetbrains.kotlin.multiplatform",          version.ref = "kotlin" }
 kotlin-serialization  = { id = "org.jetbrains.kotlin.plugin.serialization",   version.ref = "kotlin" }
@@ -34,3 +65,5 @@ compose-multiplatform = { id = "org.jetbrains.compose",                        v
 compose-compiler      = { id = "org.jetbrains.kotlin.plugin.compose",          version.ref = "kotlin" }
 android-application   = { id = "com.android.application",                      version.ref = "agp" }
 android-library       = { id = "com.android.library",                          version.ref = "agp" }
+kotlin-jvm            = { id = "org.jetbrains.kotlin.jvm",                      version.ref = "kotlin" }
+intellij-platform = { id = "org.jetbrains.intellij.platform", version.ref = "intellij-platform" }

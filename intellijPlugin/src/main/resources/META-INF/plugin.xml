@@ -1,0 +1,25 @@
+<idea-plugin>
+    <id>com.agentpilot.plugin</id>
+    <name>AgentPilot</name>
+    <version>0.1.0</version>
+    <description>Mobile command center for AI coding agents</description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow
+            id="AgentPilot"
+            anchor="right"
+            factoryClass="com.agentpilot.plugin.AgentPilotToolWindow"
+            icon="/icons/agentpilot.svg" />
+    </extensions>
+
+    <applicationListeners>
+        <listener
+            class="com.agentpilot.plugin.AgentPilotPlugin"
+            topic="com.intellij.openapi.project.ProjectManagerListener" />
+        <listener
+            class="com.agentpilot.plugin.LlmActionInterceptor"
+            topic="com.intellij.openapi.actionSystem.ex.AnActionListener" />
+    </applicationListeners>
+</idea-plugin>
