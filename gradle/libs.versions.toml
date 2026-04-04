@@ -42,7 +42,6 @@ camerax-lifecycle           = { module = "androidx.camera:camera-lifecycle",    
 camerax-view                = { module = "androidx.camera:camera-view",               version.ref = "camerax" }
 mlkit-barcode               = { module = "com.google.mlkit:barcode-scanning",         version.ref = "mlkit-barcode" }
 activity-compose            = { module = "androidx.activity:activity-compose",        version.ref = "activity-compose" }
-lifecycle-runtime-compose   = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle-runtime-compose" }
 # Ktor server (plugin only)
 ktor-server-netty        = { module = "io.ktor:ktor-server-netty",                   version.ref = "ktor" }
 ktor-server-websockets   = { module = "io.ktor:ktor-server-websockets",              version.ref = "ktor" }
