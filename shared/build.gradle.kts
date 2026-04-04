@@ -21,12 +21,14 @@ kotlin {
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
 
             // Networking
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.websockets)
             implementation(libs.ktor.client.content.neg)
             implementation(libs.ktor.serialization.json)
+            implementation(libs.ktor.network)
 
             // Async + serialization
             implementation(libs.coroutines.core)
@@ -42,6 +44,14 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)      // Android HTTP engine
             implementation(libs.coroutines.android)
+
+            // QR code scanning
+            implementation(libs.camerax.camera2)
+            implementation(libs.camerax.lifecycle)
+            implementation(libs.camerax.view)
+            implementation(libs.mlkit.barcode)
+            implementation(libs.activity.compose)
+            implementation(libs.lifecycle.runtime.compose)
         }
     }
 }
