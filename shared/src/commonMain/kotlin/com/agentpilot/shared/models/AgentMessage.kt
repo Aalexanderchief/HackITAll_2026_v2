@@ -3,6 +3,8 @@ package com.agentpilot.shared.models
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.datetime.Instant
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
 sealed class AgentMessage {
@@ -73,7 +75,21 @@ sealed class AgentMessage {
         val version: String,
         val capabilities: List<String>,
     ) : AgentMessage()
+
+    /** Envelope broadcast by the IntelliJ plugin for every intercepted event. */
+    @Serializable
+    @SerialName("mcp-notification")
+    data class McpNotification(
+        val payload: McpPayload
+    ) : AgentMessage()
 }
+
+@Serializable
+data class McpPayload(
+    val endpoint: String,
+    val content: JsonElement = JsonObject(emptyMap()),
+    val timestamp: String,
+)
 
 enum class AgentStatus { IDLE, RUNNING, WAITING_FOR_INPUT, WAITING_FOR_REVIEW, COMPLETED, FAILED }
 enum class InputSource   { TEXT, VOICE }

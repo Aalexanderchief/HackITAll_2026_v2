@@ -34,14 +34,26 @@ object WebSocketServer {
                     val id = java.util.UUID.randomUUID().toString()
                     sessions[id] = this
                     try {
-                        for (frame in incoming) { /* phone→IDE messages handled in future */ }
+                        for (frame in incoming) {
+                            if (frame is Frame.Text && frame.readText().contains("\"connection_handshake\"")) {
+                                send(Frame.Text("""{"type":"connection_handshake","version":"1.0","capabilities":["clarification","code-review"]}"""))
+                            }
+                        }
                     } finally {
                         sessions.remove(id)
                     }
                 }
             }
         }
-        scope.launch { server!!.start(wait = false) }
+        scope.launch {
+            try {
+                server!!.start(wait = false)
+            } catch (e: Exception) {
+                running.set(false)
+                System.err.println("[AgentPilot] WebSocket server failed to start: ${e.message}")
+                e.printStackTrace()
+            }
+        }
         scope.launch { collectEvents() }
     }
 
@@ -72,9 +84,35 @@ object WebSocketServer {
     private suspend fun collectEvents() {
         AgentEventBus.events.collect { event ->
             when (event) {
-                is AgentEvent.McpToolCall -> broadcast(event.endpoint, event.content)
-                is AgentEvent.LlmRequest  -> broadcast("llm/request",  Json.encodeToJsonElement(event))
-                is AgentEvent.IdeSignal   -> broadcast("ide/signal",   Json.encodeToJsonElement(event))
+                is AgentEvent.McpToolCall -> {
+                    broadcast(event.endpoint, event.content)
+                    broadcastAgentStatus("agent-pilot", "RUNNING", "Tool: ${event.endpoint}")
+                }
+                is AgentEvent.LlmRequest -> {
+                    broadcast("llm/request", Json.encodeToJsonElement(event))
+                    val fileName = event.filePath.substringAfterLast("/")
+                    broadcastAgentStatus("agent-pilot", "RUNNING", "${event.actionId} @ $fileName:${event.caretLine}")
+                }
+                is AgentEvent.IdeSignal -> {
+                    broadcast("ide/signal", Json.encodeToJsonElement(event))
+                    broadcastAgentStatus("agent-pilot", event.type, event.detail)
+                }
+            }
+        }
+    }
+
+    private fun broadcastAgentStatus(agentId: String, status: String, currentTask: String) {
+        val msg = buildJsonObject {
+            put("type", "agent_status_update")
+            put("agentId", agentId)
+            put("status", status)
+            put("progress", 0.5f)
+            put("currentTask", currentTask)
+        }
+        val text = Json.encodeToString(msg)
+        scope.launch {
+            sessions.values.toList().forEach { session ->
+                runCatching { session.send(Frame.Text(text)) }
             }
         }
     }

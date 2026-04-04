@@ -5,18 +5,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.agentpilot.android.ui.components.AgentStatusCard
 import com.agentpilot.shared.models.AgentStatus
+import com.agentpilot.shared.network.ConnectionState
 
-/**
- * Agent List Screen - displays all active agents with their current status.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgentListScreen(
@@ -25,12 +23,11 @@ fun AgentListScreen(
 ) {
     val agents by viewModel.filteredAgents.collectAsState()
     val filterStatus by viewModel.filterStatus.collectAsState()
+    val connectionState by viewModel.connectionState.collectAsState()
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("AgentPilot") }
-            )
+            TopAppBar(title = { Text("AgentPilot") })
         }
     ) { paddingValues ->
         Column(
@@ -38,20 +35,23 @@ fun AgentListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Filter chips
+            ConnectRow(
+                connectionState = connectionState,
+                onConnect = { ip -> viewModel.connectViaIp(ip) },
+                onDisconnect = { viewModel.disconnect() }
+            )
+
+            HorizontalDivider()
+
             StatusFilterRow(
                 selectedStatus = filterStatus,
                 onFilterSelected = { status ->
-                    if (filterStatus == status) {
-                        viewModel.clearFilter()
-                    } else {
-                        viewModel.setFilter(status)
-                    }
+                    if (filterStatus == status) viewModel.clearFilter()
+                    else viewModel.setFilter(status)
                 },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            // Agent list
             if (agents.isEmpty()) {
                 EmptyAgentList(
                     modifier = Modifier
@@ -64,10 +64,7 @@ fun AgentListScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(
-                        items = agents,
-                        key = { it.agentId }
-                    ) { agent ->
+                    items(items = agents, key = { it.agentId }) { agent ->
                         AgentStatusCard(
                             agentUpdate = agent,
                             onClick = { onAgentClick(agent.agentId) }
@@ -79,9 +76,71 @@ fun AgentListScreen(
     }
 }
 
-/**
- * Filter chips for agent status.
- */
+@Composable
+private fun ConnectRow(
+    connectionState: ConnectionState,
+    onConnect: (String) -> Unit,
+    onDisconnect: () -> Unit
+) {
+    var ip by remember { mutableStateOf("10.0.2.2") }
+    val isConnected = connectionState is ConnectionState.Connected
+    val isConnecting = connectionState is ConnectionState.Connecting
+    val isFailed = connectionState is ConnectionState.Failed
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val dotColor = when (connectionState) {
+                is ConnectionState.Connected -> Color(0xFF4CAF50)
+                is ConnectionState.Connecting -> Color(0xFFFFC107)
+                is ConnectionState.Failed -> Color(0xFFFF5722)
+                else -> Color(0xFF9E9E9E)
+            }
+            Text("●", color = dotColor)
+
+            OutlinedTextField(
+                value = ip,
+                onValueChange = { ip = it },
+                placeholder = { Text("10.0.2.2 (emulator) or LAN IP") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                enabled = !isConnected && !isConnecting,
+                textStyle = MaterialTheme.typography.bodySmall
+            )
+
+            Button(
+                onClick = { if (isConnected) onDisconnect() else onConnect(ip) },
+                enabled = !isConnecting && (isConnected || ip.isNotBlank())
+            ) {
+                Text(if (isConnected) "Disconnect" else if (isConnecting) "..." else "Connect")
+            }
+        }
+
+        if (isFailed) {
+            val errorMsg = (connectionState as ConnectionState.Failed).cause.message ?: "Unknown error"
+            Text(
+                text = "Error: $errorMsg",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFFF5722),
+                modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 4.dp)
+            )
+        }
+        if (isConnected) {
+            Text(
+                text = "Connected to ${(connectionState as ConnectionState.Connected).peerVersion}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF4CAF50),
+                modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 4.dp)
+            )
+        }
+    }
+}
+
 @Composable
 private fun StatusFilterRow(
     selectedStatus: AgentStatus?,
@@ -107,19 +166,11 @@ private fun StatusFilterRow(
     }
 }
 
-/**
- * Empty state when no agents match the filter.
- */
 @Composable
-private fun EmptyAgentList(
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier,
-        contentAlignment = androidx.compose.ui.Alignment.Center
-    ) {
+private fun EmptyAgentList(modifier: Modifier = Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Column(
-            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Text(
@@ -129,7 +180,7 @@ private fun EmptyAgentList(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Agents will appear here when they start working",
+                text = "Connect to IntelliJ and trigger an AI action",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
