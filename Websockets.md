@@ -188,19 +188,30 @@ The mobile app's `QrScannerScreen` (in `androidMain`) decodes the raw string fro
 
 ### Observed flows
 
+All flows are `StateFlow` — they always hold the current value, have no replay gap, and are safe to collect at any point in the composable lifecycle via `collectAsState()`.
+
 ```kotlin
-val connectionState: StateFlow<ConnectionState>  // WS lifecycle
-val discoveryState:  StateFlow<DiscoveryState>   // UDP discovery phase
-val messages:        SharedFlow<AgentMessage>     // all incoming messages
+val connectionState:    StateFlow<ConnectionState>                          // WS lifecycle
+val discoveryState:     StateFlow<DiscoveryState>                           // UDP discovery phase
+val agentStatuses:      StateFlow<Map<String, AgentMessage.AgentStatusUpdate>> // latest status per agentId
+val activeClarification:StateFlow<AgentMessage.ClarificationRequest?>       // show dialog when non-null
+val activeCodeReview:   StateFlow<AgentMessage.CodeChangeProposal?>         // show review sheet when non-null
+val activityFeed:       StateFlow<List<AgentMessage>>                       // last 50 messages, chronological
 ```
 
-`messages` is a `SharedFlow` with no replay — subscribers only see messages emitted after they start collecting. Person B's screens should collect from this flow in a coroutine tied to the composable lifecycle.
+The ViewModel processes the raw WebSocket stream internally (via an `init` coroutine collecting `WebSocketClient.messages`) and keeps these derived states up to date. Person B never needs to route or filter messages — each screen binds to exactly the flow it needs.
+
+**`activeClarification`** is set when a `ClarificationRequest` arrives and cleared automatically when `send()` is called with a `ClarificationResponse`. A composable can show/hide the dialog purely by observing `activeClarification != null`.
+
+**`activeCodeReview`** follows the same pattern with `CodeChangeProposal` / `CodeChangeVerdict`.
+
+**`agentStatuses`** is a map keyed by `agentId`. Each `AgentStatusUpdate` overwrites the previous entry for that agent, so the map always reflects the latest known state for every agent seen so far.
 
 ### Connection entry points
 
 ```kotlin
-viewModel.connectViaQr(url)          // URL from QrScannerScreen.onScanned
-viewModel.connectViaCode("A3F-92B")  // user-entered code, triggers UDP discovery
+viewModel.connectViaQr(url)           // URL from QrScannerScreen.onScanned
+viewModel.connectViaCode("A3F-92B")   // user-entered code, triggers UDP discovery
 viewModel.connectViaIp("192.168.1.5") // direct IP, assumes port 27042
 ```
 
@@ -214,7 +225,7 @@ viewModel.send(AgentMessage.ClarificationResponse(id = "clr-1", answer = "Plugin
 viewModel.send(AgentMessage.CodeChangeVerdict(id = "cp-1", action = ChangeAction.ACCEPT, alternative = null))
 ```
 
-`send()` is a suspend function — call it from a coroutine. It is a no-op if not connected.
+`send()` is a suspend function — call it from a coroutine. It is a no-op if not connected. After `send()`, the corresponding active state (`activeClarification` or `activeCodeReview`) is cleared automatically, so dialogs and sheets dismiss without any extra UI logic.
 
 ---
 
