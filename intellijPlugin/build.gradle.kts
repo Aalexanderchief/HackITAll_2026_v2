@@ -19,7 +19,7 @@ dependencies {
     intellijPlatform {
         intellijIdeaCommunity("2024.3.1")
         bundledPlugin("com.intellij.java")
-        instrumentationTools()
+instrumentationTools()
     }
 
     // Ktor server 3.0.3 — compiled with Kotlin 2.0.x, compatible with IntelliJ 2024.3.1's

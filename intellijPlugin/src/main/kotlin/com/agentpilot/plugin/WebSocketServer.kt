@@ -18,8 +18,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 object WebSocketServer {
 
     private val sessions = ConcurrentHashMap<String, DefaultWebSocketSession>()
+    private val eventCounter = java.util.concurrent.atomic.AtomicInteger(0)
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val running = AtomicBoolean(false)
 
     val isRunning: Boolean get() = running.get()
@@ -27,7 +28,9 @@ object WebSocketServer {
     fun start() {
         if (running.getAndSet(true)) return
         server = embeddedServer(Netty, port = 27042) {
-            install(WebSockets)
+            install(WebSockets) {
+                pingPeriod = kotlin.time.Duration.parse("PT15S")
+            }
             install(ContentNegotiation) { json() }
             routing {
                 webSocket("/") {
@@ -101,12 +104,13 @@ object WebSocketServer {
         }
     }
 
-    private fun broadcastAgentStatus(agentId: String, status: String, currentTask: String) {
+    fun broadcastAgentStatus(agentId: String, status: String, currentTask: String) {
+        val progress = (eventCounter.incrementAndGet() % 10) / 10f
         val msg = buildJsonObject {
             put("type", "agent_status_update")
             put("agentId", agentId)
             put("status", status)
-            put("progress", 0.5f)
+            put("progress", progress)
             put("currentTask", currentTask)
         }
         val text = Json.encodeToString(msg)

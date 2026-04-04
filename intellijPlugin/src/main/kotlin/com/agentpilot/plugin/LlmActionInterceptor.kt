@@ -19,7 +19,11 @@ class LlmActionInterceptor : AnActionListener {
 
     override fun beforeActionPerformed(action: AnAction, event: AnActionEvent) {
         val actionId = event.actionManager?.getId(action) ?: return
-        if (aiActionPrefixes.none { actionId.startsWith(it) }) return
+        if (aiActionPrefixes.none { actionId.startsWith(it) }) {
+            System.err.println("[AgentPilot] action: $actionId")
+            return
+        }
+        System.err.println("[AgentPilot] AI action intercepted: $actionId")
 
         val editor = event.getData(CommonDataKeys.EDITOR) ?: return
         val virtualFile = event.getData(CommonDataKeys.VIRTUAL_FILE)
