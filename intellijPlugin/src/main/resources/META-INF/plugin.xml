@@ -18,5 +18,8 @@
         <listener
             class="com.agentpilot.plugin.AgentPilotPlugin"
             topic="com.intellij.openapi.project.ProjectManagerListener" />
+        <listener
+            class="com.agentpilot.plugin.LlmActionInterceptor"
+            topic="com.intellij.openapi.actionSystem.ex.AnActionListener" />
     </applicationListeners>
 </idea-plugin>
