@@ -1,5 +1,6 @@
 package com.agentpilot.plugin
 
+import com.agentpilot.plugin.platform.NotificationService
 import com.intellij.openapi.application.ApplicationManager
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
@@ -22,6 +23,7 @@ object SidecarBridge {
     private var bridgeScope: CoroutineScope? = null
     private val pendingApprovals = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
     private val pendingVerdicts   = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
+    private val notificationService = NotificationService()
 
     // Tools that write files — shown as CodeChangeProposal (diff) on mobile
     private val fileWriteTools = setOf(
@@ -101,7 +103,15 @@ object SidecarBridge {
         }
     }
 
-    /** Called by WebSocketServer when a clarification_response arrives from mobile. */
+    fun stop() {
+        java.awt.Toolkit.getDefaultToolkit().removeAWTEventListener(awtListener)
+        pendingApprovals.values.forEach { it.cancel() }
+        pendingApprovals.clear()
+        pendingVerdicts.values.forEach { it.cancel() }
+        pendingVerdicts.clear()
+    }
+
+    /** Called by WebSocketServer when a clarification_response arrives from the mobile app. */
     fun resolveApproval(requestId: String, approved: Boolean) {
         pendingApprovals.remove(requestId)?.complete(approved)
     }
@@ -262,6 +272,10 @@ object SidecarBridge {
         val deferred  = CompletableDeferred<Boolean>()
         pendingApprovals[requestId] = deferred
         pendingDialogCount.incrementAndGet()
+
+        // Local desktop notification
+        notificationService.notify("Approval Required", "Agent wants to run $toolName")
+        notificationService.vibrate()
 
         WebSocketServer.broadcastAgentStatus("mcp-agent", "WAITING_FOR_INPUT", "$toolName: $detail")
         WebSocketServer.broadcastClarificationRequest(

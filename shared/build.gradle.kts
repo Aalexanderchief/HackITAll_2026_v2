@@ -10,6 +10,7 @@ kotlin {
     jvmToolchain(17)   // Android/ART bytecode ceiling — keep at 17 regardless of host JDK
 
     androidTarget()
+    jvm()
 
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
