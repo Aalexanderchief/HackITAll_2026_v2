@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "jetbrains": {
+      "command": "npx",
+      "args": ["-y", "mcp-proxy-sidecar"],
+      "env": { "WS_PORT": "27045", "LOG_ENABLED": "true" }
+    }
+  }
+}

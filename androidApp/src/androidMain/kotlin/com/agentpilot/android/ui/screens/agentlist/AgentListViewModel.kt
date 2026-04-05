@@ -41,7 +41,18 @@ class AgentListViewModel : ViewModel() {
     val activeClarification: StateFlow<AgentMessage.ClarificationRequest?> =
         connectionViewModel.activeClarification
 
-    fun connectViaIp(ip: String) = connectionViewModel.connectViaIp(ip)
+    /**
+     * Accepts either a raw IP address ("10.0.0.5") or a discovery token ("JB-482-XKQ").
+     * Tokens are sent as UDP broadcasts so the plugin can reply with the WebSocket URL.
+     */
+    fun connect(input: String) {
+        val trimmed = input.trim()
+        if (trimmed.startsWith("JB-", ignoreCase = true)) {
+            connectionViewModel.connectViaCode(trimmed.uppercase())
+        } else {
+            connectionViewModel.connectViaIp(trimmed)
+        }
+    }
 
     fun disconnect() = connectionViewModel.disconnect()
 

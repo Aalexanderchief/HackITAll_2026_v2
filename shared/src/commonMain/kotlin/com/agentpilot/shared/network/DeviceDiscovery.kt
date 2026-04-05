@@ -28,7 +28,11 @@ private const val TIMEOUT_MS = 5_000L
  */
 suspend fun discoverDevice(code: String): String {
     val selectorManager = SelectorManager(Dispatchers.IO)
-    val socket = aSocket(selectorManager).udp().bind()
+    // SO_BROADCAST must be set to send to 255.255.255.255; without it the OS
+    // silently drops the packet and the server never sees the discovery request.
+    val socket = aSocket(selectorManager).udp().bind {
+        broadcast = true
+    }
 
     return socket.use {
         val payload = Buffer().apply { writeString("DISCOVER:$code") }
