@@ -109,15 +109,17 @@ class ConnectionViewModel {
     }
 
     /**
-     * Connects by broadcasting [code] (e.g. "A3F-92B") over UDP to discover the
+     * Connects by broadcasting [code] (e.g. "JB-482-XKQ") over UDP to discover the
      * IntelliJ plugin on the local network, then connects to the returned URL.
+     * [broadcastAddress] should be the subnet-directed broadcast ("192.168.x.255"),
+     * NOT "255.255.255.255" — Android drops limited-broadcast on many WiFi chipsets.
      * Drives [discoveryState] through Searching → Idle (success) or NotFound / Error.
      */
-    fun connectViaCode(code: String) {
+    fun connectViaCode(code: String, broadcastAddress: String) {
         scope.launch {
             _discoveryState.value = DiscoveryState.Searching
             try {
-                val url = discoverDevice(code)
+                val url = discoverDevice(code, broadcastAddress)
                 _discoveryState.value = DiscoveryState.Idle
                 client.connect(url)
             } catch (e: TimeoutCancellationException) {

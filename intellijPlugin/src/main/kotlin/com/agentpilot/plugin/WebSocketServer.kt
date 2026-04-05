@@ -11,9 +11,17 @@ import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.Inet4Address
+import java.net.NetworkInterface
+import java.net.SocketTimeoutException
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+
+private const val DISCOVERY_PORT = 27043
+private const val WS_PORT = 27042
 
 object WebSocketServer {
 
@@ -23,7 +31,46 @@ object WebSocketServer {
     val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val running = AtomicBoolean(false)
 
+    /**
+     * The last clarification request that hasn't been answered yet.
+     * Sent to any phone that connects while an approval is pending so that a late-joining
+     * phone can still approve/reject the tool call within the 60-second window.
+     */
+    @Volatile private var pendingClarification: String? = null
+
+    /** Connection token shown in the tool window, e.g. "JB-482-XKQ". */
+    val token: String = generateToken()
+
     val isRunning: Boolean get() = running.get()
+
+    /**
+     * Returns the machine's LAN IPv4 address, preferring 10.x/192.168.x ranges
+     * (WiFi/Ethernet) over 172.x ranges (Docker bridges, etc.).
+     */
+    fun localIp(): String {
+        val candidates = NetworkInterface.getNetworkInterfaces()
+            ?.asSequence()
+            ?.filter { iface -> !iface.isLoopback && iface.isUp }
+            ?.flatMap { it.inetAddresses.asSequence() }
+            ?.filterIsInstance<Inet4Address>()
+            ?.filter { !it.isLoopbackAddress }
+            ?.map { it.hostAddress ?: "" }
+            ?.filter { it.isNotEmpty() }
+            ?.toList() ?: emptyList()
+
+        return candidates.firstOrNull { it.startsWith("10.") || it.startsWith("192.168.") }
+            ?: candidates.firstOrNull { it.startsWith("172.") }
+            ?: candidates.firstOrNull()
+            ?: "localhost"
+    }
+
+    private fun generateToken(): String {
+        // Exclude I/O/0/1 to avoid visual ambiguity
+        val safeLetters = ('A'..'Z').filter { it != 'I' && it != 'O' }
+        val digits = (0..2).map { (0..9).random() }.joinToString("")
+        val letters = (0..2).map { safeLetters.random() }.joinToString("")
+        return "JB-$digits-$letters"
+    }
 
     fun start() {
         if (running.getAndSet(true)) return
@@ -41,8 +88,12 @@ object WebSocketServer {
                             if (frame !is Frame.Text) continue
                             val text = frame.readText()
                             when {
-                                text.contains("\"connection_handshake\"") ->
+                                text.contains("\"connection_handshake\"") -> {
                                     send(Frame.Text("""{"type":"connection_handshake","version":"1.0","capabilities":["clarification","code-review"]}"""))
+                                    // Replay any pending clarification so a late-joining phone
+                                    // can still respond within the 60-second approval window.
+                                    pendingClarification?.let { send(Frame.Text(it)) }
+                                }
                                 text.contains("\"clarification_response\"") ->
                                     handleClarificationResponse(text)
                                 text.contains("\"code_change_verdict\"") ->
@@ -65,6 +116,36 @@ object WebSocketServer {
             }
         }
         scope.launch { collectEvents() }
+        scope.launch(Dispatchers.IO) { runUdpDiscovery() }
+    }
+
+    /**
+     * Listens on UDP port 27043 for "DISCOVER:<token>" broadcasts.
+     * When the token matches, replies with the WebSocket URL so the client
+     * can establish a direct WebSocket connection.
+     */
+    private fun runUdpDiscovery() {
+        try {
+            DatagramSocket(DISCOVERY_PORT).use { socket ->
+                socket.soTimeout = 1_000   // 1 s — lets us check isActive without blocking forever
+                val buf = ByteArray(256)
+                while (scope.isActive && running.get()) {
+                    val packet = DatagramPacket(buf, buf.size)
+                    try {
+                        socket.receive(packet)
+                    } catch (_: SocketTimeoutException) {
+                        continue
+                    }
+                    val message = String(packet.data, 0, packet.length).trim()
+                    if (message == "DISCOVER:$token") {
+                        val reply = "ws://${localIp()}:$WS_PORT".toByteArray()
+                        socket.send(DatagramPacket(reply, reply.size, packet.address, packet.port))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            System.err.println("[AgentPilot] UDP discovery error: ${e.message}")
+        }
     }
 
     fun stop() {
@@ -72,6 +153,15 @@ object WebSocketServer {
         server?.stop(500, 1000)
         server = null
         sessions.clear()
+        pendingClarification = null
+    }
+
+    fun broadcastRaw(json: String) {
+        scope.launch {
+            sessions.values.toList().forEach { session ->
+                runCatching { session.send(Frame.Text(json)) }
+            }
+        }
     }
 
     fun broadcast(endpoint: String, content: JsonElement = JsonObject(emptyMap())) {
@@ -119,6 +209,7 @@ object WebSocketServer {
             put("context", context)
         }
         val text = Json.encodeToString(msg)
+        pendingClarification = text   // store so late-connecting phones can still respond
         scope.launch {
             sessions.values.toList().forEach { session ->
                 runCatching { session.send(Frame.Text(text)) }
@@ -131,6 +222,7 @@ object WebSocketServer {
             val obj = Json.parseToJsonElement(text).jsonObject
             val id = obj["id"]?.jsonPrimitive?.content ?: return
             val answer = obj["answer"]?.jsonPrimitive?.content ?: return
+            pendingClarification = null   // clear once the phone has responded
             SidecarBridge.resolveApproval(id, answer == "approved")
         } catch (e: Exception) {
             System.err.println("[AgentPilot] Failed to parse clarification response: ${e.message}")

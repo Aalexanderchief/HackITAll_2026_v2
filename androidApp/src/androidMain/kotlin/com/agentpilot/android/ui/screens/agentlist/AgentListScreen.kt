@@ -61,7 +61,7 @@ fun AgentListScreen(
         ) {
             ConnectRow(
                 connectionState = connectionState,
-                onConnect = { ip -> viewModel.connectViaIp(ip) },
+                onConnect    = { input -> viewModel.connect(input) },
                 onDisconnect = { viewModel.disconnect() }
             )
 
@@ -130,7 +130,7 @@ private fun ConnectRow(
             OutlinedTextField(
                 value = ip,
                 onValueChange = { ip = it },
-                placeholder = { Text("10.0.2.2 (emulator) or LAN IP") },
+                placeholder = { Text("IP (10.x.x.x) or token (JB-123-ABC)") },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
                 enabled = !isConnected && !isConnecting,
