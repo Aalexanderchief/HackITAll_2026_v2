@@ -2,7 +2,6 @@ package com.agentpilot.android.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -10,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.agentpilot.shared.models.AgentMessage
+import com.agentpilot.shared.platform.SpeechMicButton
 
 /**
  * Dialog for responding to agent clarification requests.
@@ -88,19 +88,10 @@ fun ClarificationDialog(
                             maxLines = 5
                         )
 
-                        // Voice input button (placeholder for Person C's implementation)
-                        OutlinedButton(
-                            onClick = { /* TODO: Person C will implement voice input */ },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Mic,
-                                contentDescription = "Voice input",
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Use Voice Input")
-                        }
+                        SpeechMicButton(
+                            onResult = { transcribed -> textResponse = transcribed },
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
                     }
                 }
             }

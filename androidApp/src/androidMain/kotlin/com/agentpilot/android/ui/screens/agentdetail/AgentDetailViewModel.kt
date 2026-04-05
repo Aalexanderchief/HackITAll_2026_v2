@@ -110,6 +110,10 @@ class AgentDetailViewModel(
             is AgentMessage.ConnectionHandshake -> {
                 _events.update { it + message }
             }
+
+            else -> {
+                // Unhandled message type — ignore silently
+            }
         }
     }
 
