@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.agentpilot.android.AgentPilotApplication
 import com.agentpilot.shared.models.AgentMessage
 import com.agentpilot.shared.models.AgentStatus
+import com.agentpilot.shared.models.ChangeAction
+import com.agentpilot.shared.models.InputSource
 import com.agentpilot.shared.network.ConnectionState
 import kotlinx.coroutines.flow.*
 
@@ -36,6 +38,12 @@ class AgentListViewModel : ViewModel() {
         initialValue = emptyList()
     )
 
+    val activeClarification: StateFlow<AgentMessage.ClarificationRequest?> =
+        connectionViewModel.activeClarification
+
+    val activeCodeReview: StateFlow<AgentMessage.CodeChangeProposal?> =
+        connectionViewModel.activeCodeReview
+
     fun connectViaIp(ip: String) = connectionViewModel.connectViaIp(ip)
 
     fun disconnect() = connectionViewModel.disconnect()
@@ -43,6 +51,30 @@ class AgentListViewModel : ViewModel() {
     fun setFilter(status: AgentStatus?) { _filterStatus.value = status }
 
     fun clearFilter() { _filterStatus.value = null }
+
+    fun respondToClarification(id: String, approved: Boolean) {
+        viewModelScope.launch {
+            connectionViewModel.send(
+                AgentMessage.ClarificationResponse(
+                    id = id,
+                    answer = if (approved) "approved" else "rejected",
+                    source = InputSource.TEXT
+                )
+            )
+        }
+    }
+
+    fun submitVerdict(id: String, accepted: Boolean) {
+        viewModelScope.launch {
+            connectionViewModel.send(
+                AgentMessage.CodeChangeVerdict(
+                    id = id,
+                    action = if (accepted) ChangeAction.ACCEPT else ChangeAction.REJECT,
+                    alternative = null
+                )
+            )
+        }
+    }
 
     override fun onCleared() {
         super.onCleared()
