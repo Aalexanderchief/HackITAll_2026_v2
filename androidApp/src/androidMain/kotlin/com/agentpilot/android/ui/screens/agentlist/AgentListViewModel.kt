@@ -67,11 +67,17 @@ class AgentListViewModel : ViewModel() {
             val wifi = AgentPilotApplication.instance
                 .getSystemService(Context.WIFI_SERVICE) as WifiManager
             val dhcp = wifi.dhcpInfo
-            val broadcast = (dhcp.ipAddress and dhcp.netmask) or dhcp.netmask.inv()
+
+            // Calculate broadcast address: (ipAddress & netmask) | ~netmask
+            // DHCP info values are already in network byte order (big-endian)
+            val broadcastInt = (dhcp.ipAddress and dhcp.netmask) or dhcp.netmask.inv()
+
+            // Convert to bytes in network byte order (big-endian)
             val bytes = ByteBuffer.allocate(4)
-                .order(ByteOrder.LITTLE_ENDIAN)
-                .putInt(broadcast)
+                .order(ByteOrder.BIG_ENDIAN)
+                .putInt(broadcastInt)
                 .array()
+
             InetAddress.getByAddress(bytes).hostAddress ?: "255.255.255.255"
         } catch (e: Exception) {
             "255.255.255.255"

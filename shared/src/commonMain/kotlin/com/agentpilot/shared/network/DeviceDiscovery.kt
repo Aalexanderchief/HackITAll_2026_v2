@@ -11,7 +11,7 @@ import kotlinx.io.readString
 import kotlinx.io.writeString
 
 private const val DISCOVERY_PORT = 27043
-private const val TIMEOUT_MS = 5_000L
+private const val TIMEOUT_MS = 10_000L  // 10s timeout allows for network latency and plugin startup
 
 /**
  * Discovers the IntelliJ plugin on the local network by broadcasting [code]
@@ -39,7 +39,34 @@ suspend fun discoverDevice(code: String, broadcastAddress: String): String {
             )
         )
         withTimeout(TIMEOUT_MS) {
-            socket.receive().packet.readString()
+            val response = socket.receive().packet.readString()
+            validateDiscoveryResponse(response)
         }
     }
+}
+
+/**
+ * Validates that the received discovery response is a valid WebSocket URL.
+ * Expected format: "ws://192.168.x.x:27042"
+ */
+private fun validateDiscoveryResponse(response: String): String {
+    val trimmed = response.trim()
+
+    // Must start with ws:// or wss://
+    if (!trimmed.startsWith("ws://") && !trimmed.startsWith("wss://")) {
+        throw IllegalArgumentException("Invalid discovery response: must start with ws:// or wss://")
+    }
+
+    // Must contain port number (27042)
+    if (!trimmed.contains(":27042")) {
+        throw IllegalArgumentException("Invalid discovery response: expected WebSocket port 27042")
+    }
+
+    // Basic IP validation (should match pattern like 192.168.x.x or 10.x.x.x)
+    val ipPattern = Regex("""ws(s)?://(\d+\.\d+\.\d+\.\d+):27042""")
+    if (!ipPattern.containsMatchIn(trimmed)) {
+        throw IllegalArgumentException("Invalid discovery response: malformed WebSocket URL")
+    }
+
+    return trimmed
 }
