@@ -4,6 +4,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,20 +18,47 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.agentpilot.android.ui.components.AgentStatusCard
 import com.agentpilot.shared.models.AgentStatus
 import com.agentpilot.shared.network.ConnectionState
+import com.agentpilot.shared.platform.QrScannerScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgentListScreen(
     onAgentClick: (String) -> Unit,
+    isDarkTheme: Boolean = false,
+    onToggleTheme: () -> Unit = {},
     viewModel: AgentListViewModel = viewModel()
 ) {
     val agents by viewModel.filteredAgents.collectAsState()
     val filterStatus by viewModel.filterStatus.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
+    var showQrScanner by remember { mutableStateOf(false) }
+
+    if (showQrScanner) {
+        QrScannerScreen(
+            onScanned = { url ->
+                // url is a ws:// address; strip the scheme and path to get host:port for the VM
+                val hostPort = url.removePrefix("ws://").removePrefix("wss://").substringBefore("/")
+                viewModel.connectViaIp(hostPort)
+                showQrScanner = false
+            },
+            onDismiss = { showQrScanner = false }
+        )
+        return
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("AgentPilot") })
+            TopAppBar(
+                title = { Text("AgentPilot") },
+                actions = {
+                    IconButton(onClick = onToggleTheme) {
+                        Icon(
+                            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = if (isDarkTheme) "Switch to light mode" else "Switch to dark mode"
+                        )
+                    }
+                }
+            )
         }
     ) { paddingValues ->
         Column(
@@ -38,7 +69,8 @@ fun AgentListScreen(
             ConnectRow(
                 connectionState = connectionState,
                 onConnect = { ip -> viewModel.connectViaIp(ip) },
-                onDisconnect = { viewModel.disconnect() }
+                onDisconnect = { viewModel.disconnect() },
+                onScanQr = { showQrScanner = true }
             )
 
             HorizontalDivider()
@@ -80,7 +112,8 @@ fun AgentListScreen(
 private fun ConnectRow(
     connectionState: ConnectionState,
     onConnect: (String) -> Unit,
-    onDisconnect: () -> Unit
+    onDisconnect: () -> Unit,
+    onScanQr: () -> Unit = {},
 ) {
     var ip by remember { mutableStateOf("10.0.2.2") }
     val isConnected = connectionState is ConnectionState.Connected
@@ -118,6 +151,16 @@ private fun ConnectRow(
                 enabled = !isConnecting && (isConnected || ip.isNotBlank())
             ) {
                 Text(if (isConnected) "Disconnect" else if (isConnecting) "..." else "Connect")
+            }
+
+            IconButton(
+                onClick = onScanQr,
+                enabled = !isConnected && !isConnecting
+            ) {
+                Icon(
+                    imageVector = Icons.Default.QrCodeScanner,
+                    contentDescription = "Scan QR code"
+                )
             }
         }
 

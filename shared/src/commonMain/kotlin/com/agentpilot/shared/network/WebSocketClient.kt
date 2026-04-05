@@ -4,8 +4,8 @@ import com.agentpilot.shared.models.AgentMessage
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
-import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.websocket.CloseReason
+import io.ktor.websocket.DefaultWebSocketSession
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
@@ -40,7 +40,8 @@ class WebSocketClient {
         install(WebSockets)
     }
 
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val supervisorJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.Default + supervisorJob)
 
     private val _state = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val state: StateFlow<ConnectionState> = _state.asStateFlow()
@@ -48,7 +49,7 @@ class WebSocketClient {
     private val _messages = MutableSharedFlow<AgentMessage>()
     val messages: SharedFlow<AgentMessage> = _messages.asSharedFlow()
 
-    private var activeSession: DefaultClientWebSocketSession? = null
+    private var activeSession: DefaultWebSocketSession? = null
     private var connectJob: Job? = null
 
     /**
@@ -112,13 +113,13 @@ class WebSocketClient {
      */
     fun close() {
         connectJob?.cancel()
-        scope.cancel()
+        supervisorJob.cancel()
         _state.value = ConnectionState.Disconnected
     }
 
     // --- private ---
 
-    private suspend fun DefaultClientWebSocketSession.performHandshake() {
+    private suspend fun DefaultWebSocketSession.performHandshake() {
         val handshake = AgentMessage.ConnectionHandshake(
             version = "1.0",
             capabilities = listOf("clarification", "code-review")
@@ -144,7 +145,7 @@ class WebSocketClient {
         println("[AgentPilot] Handshake loop ended without success")
     }
 
-    private suspend fun DefaultClientWebSocketSession.receiveLoop() {
+    private suspend fun DefaultWebSocketSession.receiveLoop() {
         for (frame in incoming) {
             if (frame !is Frame.Text) continue
             runCatching { json.decodeFromString<AgentMessage>(frame.readText()) }

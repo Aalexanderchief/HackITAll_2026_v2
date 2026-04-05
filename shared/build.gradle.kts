@@ -13,6 +13,7 @@ kotlin {
 
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
+        freeCompilerArgs.add("-Xskip-metadata-version-check")
     }
 
     sourceSets {
