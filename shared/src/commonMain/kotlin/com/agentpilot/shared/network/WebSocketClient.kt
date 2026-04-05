@@ -129,6 +129,23 @@ class WebSocketClient {
         )
         println("[AgentPilot] Sending handshake...")
         send(Frame.Text(json.encodeToString<AgentMessage>(handshake)))
+
+        // Wait for the server's echo
+        for (frame in incoming) {
+            if (frame !is Frame.Text) continue
+            val text = frame.readText()
+            println("[AgentPilot] Received frame: $text")
+            val msg = runCatching { json.decodeFromString<AgentMessage>(text) }.getOrElse {
+                println("[AgentPilot] Failed to decode frame: ${it.message}")
+                null
+            }
+            if (msg is AgentMessage.ConnectionHandshake) {
+                println("[AgentPilot] Handshake complete, version=${msg.version}")
+                _state.value = ConnectionState.Connected(msg.version)
+                return
+            }
+        }
+        println("[AgentPilot] Handshake loop ended without success")
     }
 
     /**

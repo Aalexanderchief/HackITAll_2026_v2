@@ -50,6 +50,8 @@ class AgentListViewModel : ViewModel() {
     val activeCodeReview: StateFlow<AgentMessage.CodeChangeProposal?> =
         connectionViewModel.activeCodeReview
 
+    fun connectViaIp(ip: String) = connectionViewModel.connectViaIp(ip)
+    
     fun connect(input: String) {
         val trimmed = input.trim()
         if (trimmed.startsWith("JB-", ignoreCase = true)) {

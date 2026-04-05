@@ -106,7 +106,7 @@ private fun ConnectRow(
     onConnect: (String) -> Unit,
     onDisconnect: () -> Unit
 ) {
-    var ip by remember { mutableStateOf("") }
+    var ip by remember { mutableStateOf("10.0.2.2") }
     val isConnected = connectionState is ConnectionState.Connected
     val isConnecting = connectionState is ConnectionState.Connecting
     val isFailed = connectionState is ConnectionState.Failed
