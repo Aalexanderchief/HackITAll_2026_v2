@@ -20,6 +20,8 @@ object SidecarBridge {
     private var bridgeScope: CoroutineScope? = null
     // Each pending approval is a CompletableDeferred<Boolean> — true=approved, false=rejected
     private val pendingApprovals = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
+    // Track active tool calls to deduplicate multiple notifications for the same tool + arguments
+    private val activeToolCalls = ConcurrentHashMap<String, String>()
 
     fun start(scope: CoroutineScope, port: Int = 27044) {
         bridgeScope = scope
@@ -33,6 +35,11 @@ object SidecarBridge {
                     break
                 } catch (e: Exception) {
                     System.err.println("[AgentPilot] Sidecar bridge lost: ${e.message}, retry in ${backoffMs}ms")
+                    // Clear state on connection loss to avoid stale requests
+                    pendingApprovals.values.forEach { it.cancel() }
+                    pendingApprovals.clear()
+                    activeToolCalls.clear()
+                    
                     delay(backoffMs)
                     backoffMs = (backoffMs * 2).coerceAtMost(30_000L)
                 }
@@ -67,10 +74,16 @@ object SidecarBridge {
             }
 
             override fun onError(webSocket: WebSocket, error: Throwable) {
+                pendingApprovals.values.forEach { it.cancel() }
+                pendingApprovals.clear()
+                activeToolCalls.clear()
                 if (cont.isActive) cont.resumeWithException(Exception(error.message ?: "WebSocket error"))
             }
 
             override fun onClose(webSocket: WebSocket, statusCode: Int, reason: String): CompletionStage<*> {
+                pendingApprovals.values.forEach { it.cancel() }
+                pendingApprovals.clear()
+                activeToolCalls.clear()
                 if (cont.isActive) cont.resumeWithException(Exception("Sidecar closed: $statusCode $reason"))
                 return CompletableFuture.completedFuture(null)
             }
@@ -108,8 +121,20 @@ object SidecarBridge {
                 else -> endpoint
             }
 
+            val toolKey = "$endpoint:$content"
+            if (activeToolCalls.containsKey(toolKey)) {
+                return // Deduplicate: already waiting for or recently handled this exact tool call
+            }
+
             // Read-only tools are auto-approved — only destructive tools go to the phone
             if (!requiresApproval(toolName)) {
+                // For safe tools, deduplicate for a short window to prevent flooding the IDE with keys
+                activeToolCalls[toolKey] = "SAFE"
+                scope.launch {
+                    delay(2000) 
+                    activeToolCalls.remove(toolKey)
+                }
+                
                 acceptCurrentDialog()
                 WebSocketServer.broadcastAgentStatus("mcp-agent", "RUNNING", "$toolName: $detail")
                 return
@@ -118,6 +143,7 @@ object SidecarBridge {
             val requestId = UUID.randomUUID().toString()
             val deferred = CompletableDeferred<Boolean>()
             pendingApprovals[requestId] = deferred
+            activeToolCalls[toolKey] = requestId
 
             // Notify mobile — status WAITING_FOR_INPUT + clarification dialog
             WebSocketServer.broadcastAgentStatus("mcp-agent", "WAITING_FOR_INPUT", "$toolName: $detail")
@@ -136,6 +162,7 @@ object SidecarBridge {
                     false
                 }
                 pendingApprovals.remove(requestId)
+                activeToolCalls.remove(toolKey)
 
                 if (approved) {
                     acceptCurrentDialog()
@@ -145,6 +172,7 @@ object SidecarBridge {
                     WebSocketServer.broadcastAgentStatus("mcp-agent", "FAILED", "Rejected: $toolName")
                 }
             }
+
         } catch (e: Exception) {
             System.err.println("[AgentPilot] Failed to handle sidecar message: ${e.message}")
         }
@@ -180,10 +208,18 @@ object SidecarBridge {
         ApplicationManager.getApplication().invokeLater {
             runCatching {
                 val robot = Robot()
-                robot.delay(150)
+                robot.delay(500)
+                // Alt+A is the standard mnemonic for 'Allow' in Brave Mode/Claude dialogs
+                robot.keyPress(KeyEvent.VK_ALT)
+                robot.keyPress(KeyEvent.VK_A)
+                robot.keyRelease(KeyEvent.VK_A)
+                robot.keyRelease(KeyEvent.VK_ALT)
+                
+                robot.delay(200)
+                // Fallback to ENTER if Alt+A wasn't the right mnemonic or button wasn't focused
                 robot.keyPress(KeyEvent.VK_ENTER)
                 robot.keyRelease(KeyEvent.VK_ENTER)
-                System.err.println("[AgentPilot] Accepted Brave Mode dialog")
+                System.err.println("[AgentPilot] Accepted Brave Mode dialog (Alt+A + ENTER)")
             }.onFailure { System.err.println("[AgentPilot] Robot accept failed: ${it.message}") }
         }
     }
@@ -192,10 +228,10 @@ object SidecarBridge {
         ApplicationManager.getApplication().invokeLater {
             runCatching {
                 val robot = Robot()
-                robot.delay(150)
+                robot.delay(500)
                 robot.keyPress(KeyEvent.VK_ESCAPE)
                 robot.keyRelease(KeyEvent.VK_ESCAPE)
-                System.err.println("[AgentPilot] Rejected Brave Mode dialog")
+                System.err.println("[AgentPilot] Rejected Brave Mode dialog (ESCAPE)")
             }.onFailure { System.err.println("[AgentPilot] Robot reject failed: ${it.message}") }
         }
     }
