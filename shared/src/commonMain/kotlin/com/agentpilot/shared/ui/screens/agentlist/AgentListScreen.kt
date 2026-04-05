@@ -15,10 +15,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.agentpilot.shared.models.AgentMessage
 import com.agentpilot.shared.models.AgentStatus
+import com.agentpilot.shared.models.InputSource
 import com.agentpilot.shared.network.ConnectionState
 import com.agentpilot.shared.network.DiscoveryState
 import com.agentpilot.shared.platform.NotificationPermissionRequest
+import com.agentpilot.shared.platform.SpeechMicButton
 import com.agentpilot.shared.ui.components.AgentStatusCard
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +35,9 @@ fun AgentListScreen(
     val discoveryState by viewModel.discoveryState.collectAsState()
     val activeClarification by viewModel.activeClarification.collectAsState()
     val activeCodeReview by viewModel.activeCodeReview.collectAsState()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     NotificationPermissionRequest()
 
@@ -48,13 +54,27 @@ fun AgentListScreen(
                 toolName = request.question,
                 context = request.context,
                 onApprove = { viewModel.respondToClarification(request.id, approved = true) },
-                onReject  = { viewModel.respondToClarification(request.id, approved = false) }
+                onReject  = { viewModel.respondToClarification(request.id, approved = false) },
+                onSendCustom = { answer ->
+                    viewModel.respondToClarification(
+                        id = request.id,
+                        customAnswer = answer,
+                        source = InputSource.VOICE
+                    )
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = "Response sent: \"${answer.take(40)}\"",
+                            duration = SnackbarDuration.Short
+                        )
+                    }
+                }
             )
         }
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("AgentPilot") }) }
+        topBar = { TopAppBar(title = { Text("AgentPilot") }) },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -211,22 +231,52 @@ private fun ApprovalDialog(
     toolName: String,
     context: String,
     onApprove: () -> Unit,
-    onReject: () -> Unit
+    onReject: () -> Unit,
+    onSendCustom: (String) -> Unit
 ) {
+    var customAnswer by remember { mutableStateOf("") }
+
     AlertDialog(
         onDismissRequest = onReject,
         title = { Text(toolName, style = MaterialTheme.typography.titleMedium) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     "Claude Code wants to run:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(context, style = MaterialTheme.typography.bodyMedium)
+                HorizontalDivider()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = customAnswer,
+                        onValueChange = { customAnswer = it },
+                        placeholder = { Text("Optional voice/text note…") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        textStyle = MaterialTheme.typography.bodySmall
+                    )
+                    SpeechMicButton(
+                        onResult = { text ->
+                            customAnswer = text
+                            onSendCustom(text)
+                        }
+                    )
+                }
             }
         },
-        confirmButton = { Button(onClick = onApprove) { Text("Approve") } },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (customAnswer.isNotBlank()) {
+                    Button(onClick = { onSendCustom(customAnswer) }) { Text("Send") }
+                }
+                Button(onClick = onApprove) { Text("Approve") }
+            }
+        },
         dismissButton = { OutlinedButton(onClick = onReject) { Text("Reject") } }
     )
 }

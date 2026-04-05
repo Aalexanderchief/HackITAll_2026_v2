@@ -223,7 +223,16 @@ object WebSocketServer {
             val id = obj["id"]?.jsonPrimitive?.content ?: return
             val answer = obj["answer"]?.jsonPrimitive?.content ?: return
             pendingClarification = null   // clear once the phone has responded
-            SidecarBridge.resolveApproval(id, answer == "approved")
+            val approved = when (answer.lowercase().trim()) {
+                "approved" -> true
+                "rejected" -> false
+                else -> {
+                    // Custom voice/text note from the user — surface it in the activity feed
+                    broadcastAgentStatus("mcp-agent", "WAITING_FOR_INPUT", "Note: ${answer.take(200)}")
+                    false
+                }
+            }
+            SidecarBridge.resolveApproval(id, approved)
         } catch (e: Exception) {
             System.err.println("[AgentPilot] Failed to parse clarification response: ${e.message}")
         }

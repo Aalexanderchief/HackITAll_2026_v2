@@ -66,13 +66,18 @@ class AgentListViewModel : ViewModel() {
     fun setFilter(status: AgentStatus?) { _filterStatus.value = status }
     fun clearFilter() { _filterStatus.value = null }
 
-    fun respondToClarification(id: String, approved: Boolean) {
+    fun respondToClarification(
+        id: String,
+        approved: Boolean = true,
+        customAnswer: String? = null,
+        source: InputSource = InputSource.TEXT
+    ) {
         viewModelScope.launch {
             connectionViewModel.send(
                 AgentMessage.ClarificationResponse(
                     id = id,
-                    answer = if (approved) "approved" else "rejected",
-                    source = InputSource.TEXT
+                    answer = customAnswer ?: if (approved) "approved" else "rejected",
+                    source = source
                 )
             )
         }

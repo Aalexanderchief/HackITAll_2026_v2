@@ -25,7 +25,10 @@ actual class SpeechRecognizer actual constructor() {
     private val _state = MutableStateFlow<SpeechState>(SpeechState.Idle)
     actual val state: StateFlow<SpeechState> = _state.asStateFlow()
 
-    private val recognizer = AndroidSpeechRecognizer.createSpeechRecognizer(AppContext.app)
+    private val recognizer: AndroidSpeechRecognizer? =
+        if (AndroidSpeechRecognizer.isRecognitionAvailable(AppContext.app))
+            AndroidSpeechRecognizer.createSpeechRecognizer(AppContext.app)
+        else null
 
     private val listener = object : RecognitionListener {
 
@@ -75,7 +78,11 @@ actual class SpeechRecognizer actual constructor() {
     }
 
     init {
-        recognizer.setRecognitionListener(listener)
+        if (recognizer == null) {
+            _state.value = SpeechState.Error("Speech recognition not available on this device")
+        } else {
+            recognizer.setRecognitionListener(listener)
+        }
     }
 
     /**
@@ -84,6 +91,10 @@ actual class SpeechRecognizer actual constructor() {
      * RecognitionListener callback, not immediately.
      */
     actual fun toggle() {
+        if (recognizer == null) {
+            _state.value = SpeechState.Error("Speech recognition not available on this device")
+            return
+        }
         when (_state.value) {
             is SpeechState.Idle,
             is SpeechState.Result,
@@ -94,14 +105,14 @@ actual class SpeechRecognizer actual constructor() {
 
     /** Cancels any in-progress recognition and resets to [SpeechState.Idle]. */
     actual fun reset() {
-        recognizer.cancel()
+        recognizer?.cancel()
         _state.value = SpeechState.Idle
     }
 
     /** Releases the underlying Android recognizer. Call from DisposableEffect onDispose. */
     actual fun destroy() {
-        recognizer.cancel()
-        recognizer.destroy()
+        recognizer?.cancel()
+        recognizer?.destroy()
     }
 
     private fun startListening() {
@@ -111,7 +122,7 @@ actual class SpeechRecognizer actual constructor() {
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
-        recognizer.startListening(intent)
+        recognizer?.startListening(intent)
     }
 
     private fun errorMessage(code: Int) = when (code) {
