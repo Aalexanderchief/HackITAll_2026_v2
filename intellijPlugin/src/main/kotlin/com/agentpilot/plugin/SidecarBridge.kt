@@ -18,11 +18,53 @@ import kotlin.coroutines.resumeWithException
 object SidecarBridge {
 
     private var bridgeScope: CoroutineScope? = null
-    // Each pending approval is a CompletableDeferred<Boolean> — true=approved, false=rejected
     private val pendingApprovals = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
+
+    // Captured button refs — populated by AWT listener the moment the dialog appears
+    @Volatile private var capturedOk: javax.swing.AbstractButton? = null
+    @Volatile private var capturedCancel: javax.swing.AbstractButton? = null
+    @Volatile private var awaitingApproval = false
+
+    private val acceptLabels = setOf("ok", "run", "yes", "accept", "allow", "execute", "confirm")
+    private val rejectLabels = setOf("cancel", "no", "deny", "reject")
+
+    private val awtListener = java.awt.event.AWTEventListener { event ->
+        if (!awaitingApproval) return@AWTEventListener
+        val container: java.awt.Container? = when {
+            event is java.awt.event.WindowEvent &&
+            event.id == java.awt.event.WindowEvent.WINDOW_OPENED -> event.window as? java.awt.Container
+            event is java.awt.event.ContainerEvent &&
+            event.id == java.awt.event.ContainerEvent.COMPONENT_ADDED -> event.child as? java.awt.Container
+            else -> null
+        }
+        container?.let { scanForButtons(it) }
+    }
+
+    private fun scanForButtons(container: java.awt.Container) {
+        for (c in container.components) {
+            if (c is javax.swing.AbstractButton) {
+                val text = c.text?.trim()?.lowercase() ?: ""
+                when {
+                    text in acceptLabels -> {
+                        System.err.println("[AgentPilot] Captured OK button: '${c.text}'")
+                        capturedOk = c
+                    }
+                    text in rejectLabels -> {
+                        System.err.println("[AgentPilot] Captured Cancel button: '${c.text}'")
+                        capturedCancel = c
+                    }
+                }
+            }
+            if (c is java.awt.Container) scanForButtons(c)
+        }
+    }
 
     fun start(scope: CoroutineScope, port: Int = 27044) {
         bridgeScope = scope
+        java.awt.Toolkit.getDefaultToolkit().addAWTEventListener(
+            awtListener,
+            java.awt.AWTEvent.WINDOW_EVENT_MASK or java.awt.AWTEvent.CONTAINER_EVENT_MASK
+        )
         scope.launch(Dispatchers.IO) {
             var backoffMs = 2_000L
             while (isActive) {
@@ -118,6 +160,7 @@ object SidecarBridge {
             val requestId = UUID.randomUUID().toString()
             val deferred = CompletableDeferred<Boolean>()
             pendingApprovals[requestId] = deferred
+            awaitingApproval = true  // AWT listener now captures the approval dialog buttons
 
             // Notify mobile — status WAITING_FOR_INPUT + clarification dialog
             WebSocketServer.broadcastAgentStatus("mcp-agent", "WAITING_FOR_INPUT", "$toolName: $detail")
@@ -176,27 +219,31 @@ object SidecarBridge {
         return toolName !in safeTools
     }
 
-    private fun acceptCurrentDialog() {
-        ApplicationManager.getApplication().invokeLater {
-            runCatching {
-                val robot = Robot()
-                robot.delay(150)
-                robot.keyPress(KeyEvent.VK_ENTER)
-                robot.keyRelease(KeyEvent.VK_ENTER)
-                System.err.println("[AgentPilot] Accepted Brave Mode dialog")
-            }.onFailure { System.err.println("[AgentPilot] Robot accept failed: ${it.message}") }
-        }
-    }
+    private fun acceptCurrentDialog() = clickDialog(accept = true)
+    private fun rejectCurrentDialog() = clickDialog(accept = false)
 
-    private fun rejectCurrentDialog() {
-        ApplicationManager.getApplication().invokeLater {
-            runCatching {
-                val robot = Robot()
-                robot.delay(150)
-                robot.keyPress(KeyEvent.VK_ESCAPE)
-                robot.keyRelease(KeyEvent.VK_ESCAPE)
-                System.err.println("[AgentPilot] Rejected Brave Mode dialog")
-            }.onFailure { System.err.println("[AgentPilot] Robot reject failed: ${it.message}") }
-        }
+    private fun clickDialog(accept: Boolean) {
+        awaitingApproval = false
+        val btn = if (accept) capturedOk else capturedCancel
+        capturedOk = null
+        capturedCancel = null
+
+        // ModalityState.any() lets this run even while the modal dialog is blocking the EDT
+        ApplicationManager.getApplication().invokeLater({
+            if (btn != null) {
+                System.err.println("[AgentPilot] doClick '${btn.text}' accept=$accept")
+                btn.doClick()
+            } else {
+                // Fallback: Robot key (only works if dialog has OS focus)
+                System.err.println("[AgentPilot] No button captured, sending ${if (accept) "Enter" else "Escape"}")
+                runCatching {
+                    val robot = Robot()
+                    robot.delay(100)
+                    val key = if (accept) KeyEvent.VK_ENTER else KeyEvent.VK_ESCAPE
+                    robot.keyPress(key)
+                    robot.keyRelease(key)
+                }.onFailure { System.err.println("[AgentPilot] Robot fallback failed: ${it.message}") }
+            }
+        }, com.intellij.openapi.application.ModalityState.any())
     }
 }
