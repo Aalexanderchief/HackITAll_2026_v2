@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.agentpilot.android.AgentPilotApplication
 import com.agentpilot.shared.models.AgentMessage
 import com.agentpilot.shared.models.AgentStatus
+import com.agentpilot.shared.models.ChangeAction
 import com.agentpilot.shared.models.InputSource
 import com.agentpilot.shared.network.ConnectionState
 import kotlinx.coroutines.flow.*
@@ -41,6 +42,9 @@ class AgentListViewModel : ViewModel() {
     val activeClarification: StateFlow<AgentMessage.ClarificationRequest?> =
         connectionViewModel.activeClarification
 
+    val activeCodeReview: StateFlow<AgentMessage.CodeChangeProposal?> =
+        connectionViewModel.activeCodeReview
+
     fun connectViaIp(ip: String) = connectionViewModel.connectViaIp(ip)
 
     fun disconnect() = connectionViewModel.disconnect()
@@ -56,6 +60,18 @@ class AgentListViewModel : ViewModel() {
                     id = id,
                     answer = if (approved) "approved" else "rejected",
                     source = InputSource.TEXT
+                )
+            )
+        }
+    }
+
+    fun submitVerdict(id: String, accepted: Boolean) {
+        viewModelScope.launch {
+            connectionViewModel.send(
+                AgentMessage.CodeChangeVerdict(
+                    id = id,
+                    action = if (accepted) ChangeAction.ACCEPT else ChangeAction.REJECT,
+                    alternative = null
                 )
             )
         }

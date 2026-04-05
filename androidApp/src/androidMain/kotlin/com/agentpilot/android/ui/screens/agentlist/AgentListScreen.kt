@@ -1,5 +1,6 @@
 package com.agentpilot.android.ui.screens.agentlist
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -9,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.agentpilot.android.ui.components.AgentStatusCard
@@ -25,14 +27,26 @@ fun AgentListScreen(
     val filterStatus by viewModel.filterStatus.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
     val activeClarification by viewModel.activeClarification.collectAsState()
+    val activeCodeReview by viewModel.activeCodeReview.collectAsState()
 
-    activeClarification?.let { request ->
-        ApprovalDialog(
-            toolName = request.question,
-            context = request.context,
-            onApprove = { viewModel.respondToClarification(request.id, approved = true) },
-            onReject  = { viewModel.respondToClarification(request.id, approved = false) }
+    // Show only one dialog at a time: code review takes priority over command approval.
+    // This prevents stacking when an agent runs a command immediately after a file write.
+    if (activeCodeReview != null) {
+        val proposal = activeCodeReview!!
+        CodeReviewSheet(
+            proposal = proposal,
+            onAccept = { viewModel.submitVerdict(proposal.id, accepted = true) },
+            onReject = { viewModel.submitVerdict(proposal.id, accepted = false) }
         )
+    } else {
+        activeClarification?.let { request ->
+            ApprovalDialog(
+                toolName = request.question,
+                context = request.context,
+                onApprove = { viewModel.respondToClarification(request.id, approved = true) },
+                onReject  = { viewModel.respondToClarification(request.id, approved = false) }
+            )
+        }
     }
 
     Scaffold(
@@ -200,6 +214,99 @@ private fun ApprovalDialog(
             OutlinedButton(onClick = onReject) { Text("Reject") }
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CodeReviewSheet(
+    proposal: com.agentpilot.shared.models.AgentMessage.CodeChangeProposal,
+    onAccept: () -> Unit,
+    onReject: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // New-file proposals have only additions — no prior content to reject.
+    // Modifications have deletions (red lines) and need explicit Accept/Reject.
+    val isNewFile = proposal.explanation.startsWith("New file:")
+
+    ModalBottomSheet(
+        onDismissRequest = onReject,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = proposal.explanation,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = proposal.filePath,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            HorizontalDivider()
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                items(proposal.diff.lines()) { line ->
+                    val (bg, fg) = when {
+                        line.startsWith("+") && !line.startsWith("+++") ->
+                            Color(0xFF1B5E20) to Color(0xFFB9F6CA)
+                        line.startsWith("-") && !line.startsWith("---") ->
+                            Color(0xFF7F0000) to Color(0xFFFF8A80)
+                        line.startsWith("@@") ->
+                            Color(0xFF0D47A1) to Color(0xFFBBDEFB)
+                        else -> Color.Transparent to MaterialTheme.colorScheme.onSurface
+                    }
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            color = fg
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (bg != Color.Transparent) Modifier.background(bg) else Modifier)
+                            .padding(horizontal = 8.dp, vertical = 1.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
+            if (isNewFile) {
+                // New file: informational only — nothing to reject.
+                Button(
+                    onClick = onAccept,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("OK") }
+            } else {
+                // Modification: show diff of what changes — user decides.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onReject,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Reject") }
+                    Button(
+                        onClick = onAccept,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Accept") }
+                }
+            }
+        }
+    }
 }
 
 @Composable
