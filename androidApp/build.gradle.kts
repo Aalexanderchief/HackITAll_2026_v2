@@ -22,8 +22,11 @@ kotlin {
             implementation(compose.uiTooling)
             implementation(compose.preview)
 
-            // Lifecycle
+            // Lifecycle + Navigation + ViewModel
             implementation(libs.lifecycle.runtime.compose)
+            implementation(libs.lifecycle.viewmodel.compose)
+            implementation(libs.navigation.compose)
+            implementation(libs.activity.compose)
 
             // Coroutines
             implementation(libs.coroutines.android)

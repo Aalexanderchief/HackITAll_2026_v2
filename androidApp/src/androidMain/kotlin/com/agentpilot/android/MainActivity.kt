@@ -5,11 +5,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.agentpilot.android.ui.screens.agentdetail.AgentDetailViewModel
 import com.agentpilot.android.ui.theme.AgentPilotTheme
 import com.agentpilot.shared.ui.Routes
 import com.agentpilot.shared.ui.screens.agentdetail.AgentDetailScreen
@@ -41,8 +45,16 @@ fun AgentPilotApp() {
             route = Routes.AGENT_DETAIL,
             arguments = listOf(navArgument("agentId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val agentId = backStackEntry.savedStateHandle.get<String>("agentId") ?: return@composable
-            AgentDetailScreen(agentId = agentId, onBackClick = { navController.navigateUp() })
+            val agentId = backStackEntry.arguments?.getString("agentId") ?: return@composable
+            val vm: AgentDetailViewModel = viewModel(key = agentId) { AgentDetailViewModel(agentId) }
+            val agentStatus by vm.agentStatus.collectAsState()
+            val activityFeed by vm.activityFeed.collectAsState()
+            AgentDetailScreen(
+                agentId = agentId,
+                agentStatus = agentStatus,
+                activityFeed = activityFeed,
+                onBackClick = { navController.navigateUp() }
+            )
         }
     }
 }
