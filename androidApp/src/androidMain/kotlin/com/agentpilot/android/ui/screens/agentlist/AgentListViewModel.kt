@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.agentpilot.android.AgentPilotApplication
 import com.agentpilot.shared.models.AgentMessage
 import com.agentpilot.shared.models.AgentStatus
+import com.agentpilot.shared.models.ChangeAction
 import com.agentpilot.shared.models.InputSource
 import com.agentpilot.shared.network.ConnectionState
 import kotlinx.coroutines.flow.*
@@ -46,12 +47,9 @@ class AgentListViewModel : ViewModel() {
     val activeClarification: StateFlow<AgentMessage.ClarificationRequest?> =
         connectionViewModel.activeClarification
 
-    /**
-     * Accepts either a raw IP address ("10.0.0.5") or a discovery token ("JB-482-XKQ").
-     * For tokens, computes the subnet-directed broadcast address from the current WiFi
-     * connection instead of using 255.255.255.255, which Android silently drops on most
-     * WiFi chipsets.
-     */
+    val activeCodeReview: StateFlow<AgentMessage.CodeChangeProposal?> =
+        connectionViewModel.activeCodeReview
+
     fun connect(input: String) {
         val trimmed = input.trim()
         if (trimmed.startsWith("JB-", ignoreCase = true)) {
@@ -62,13 +60,6 @@ class AgentListViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Returns the subnet-directed broadcast address for the active WiFi network
-     * (e.g. "192.168.1.255"). Falls back to "255.255.255.255" if WiFi info is unavailable.
-     *
-     * WifiManager.dhcpInfo stores IP and netmask as little-endian ints.
-     * broadcast = (ip & mask) | ~mask, then reinterpreted as bytes in little-endian order.
-     */
     private fun wifiBroadcastAddress(): String {
         return try {
             val wifi = AgentPilotApplication.instance
@@ -98,6 +89,18 @@ class AgentListViewModel : ViewModel() {
                     id = id,
                     answer = if (approved) "approved" else "rejected",
                     source = InputSource.TEXT
+                )
+            )
+        }
+    }
+
+    fun submitVerdict(id: String, accepted: Boolean) {
+        viewModelScope.launch {
+            connectionViewModel.send(
+                AgentMessage.CodeChangeVerdict(
+                    id = id,
+                    action = if (accepted) ChangeAction.ACCEPT else ChangeAction.REJECT,
+                    alternative = null
                 )
             )
         }

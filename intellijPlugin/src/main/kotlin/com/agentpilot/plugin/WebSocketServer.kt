@@ -96,6 +96,8 @@ object WebSocketServer {
                                 }
                                 text.contains("\"clarification_response\"") ->
                                     handleClarificationResponse(text)
+                                text.contains("\"code_change_verdict\"") ->
+                                    handleCodeChangeVerdict(text)
                             }
                         }
                     } finally {
@@ -224,6 +226,33 @@ object WebSocketServer {
             SidecarBridge.resolveApproval(id, answer == "approved")
         } catch (e: Exception) {
             System.err.println("[AgentPilot] Failed to parse clarification response: ${e.message}")
+        }
+    }
+
+    private fun handleCodeChangeVerdict(text: String) {
+        try {
+            val obj = Json.parseToJsonElement(text).jsonObject
+            val id     = obj["id"]?.jsonPrimitive?.content ?: return
+            val action = obj["action"]?.jsonPrimitive?.content ?: return
+            SidecarBridge.resolveVerdict(id, action == "ACCEPT")
+        } catch (e: Exception) {
+            System.err.println("[AgentPilot] Failed to parse code change verdict: ${e.message}")
+        }
+    }
+
+    fun broadcastCodeChangeProposal(id: String, filePath: String, diff: String, explanation: String) {
+        val msg = buildJsonObject {
+            put("type", "code_change_proposal")
+            put("id", id)
+            put("filePath", filePath)
+            put("diff", diff)
+            put("explanation", explanation)
+        }
+        val text = Json.encodeToString(msg)
+        scope.launch {
+            sessions.values.toList().forEach { session ->
+                runCatching { session.send(Frame.Text(text)) }
+            }
         }
     }
 
