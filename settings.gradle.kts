@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "AgentPilot"
 include(":shared", ":androidApp", ":intellijPlugin")
+// ":intellijPlugin" excluded — build separately in IntelliJ via ./gradlew :intellijPlugin:buildPlugin

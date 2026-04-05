@@ -66,7 +66,7 @@ class WebSocketClient {
                     _state.value = ConnectionState.Connecting
                     httpClient.webSocket(url) {
                         activeSession = this
-                        performHandshake()
+                        sendHandshake()
                         backoffMs = 1_000L  // reset on successful connect
                         receiveLoop()
                     }
@@ -118,37 +118,44 @@ class WebSocketClient {
 
     // --- private ---
 
-    private suspend fun DefaultClientWebSocketSession.performHandshake() {
+    /**
+     * Sends the handshake frame without blocking on a response.
+     * [receiveLoop] handles the echo and all subsequent messages — nothing is discarded.
+     */
+    private suspend fun DefaultClientWebSocketSession.sendHandshake() {
         val handshake = AgentMessage.ConnectionHandshake(
             version = "1.0",
             capabilities = listOf("clarification", "code-review")
         )
         println("[AgentPilot] Sending handshake...")
         send(Frame.Text(json.encodeToString<AgentMessage>(handshake)))
-
-        // Wait for the server's echo
-        for (frame in incoming) {
-            if (frame !is Frame.Text) continue
-            val text = frame.readText()
-            println("[AgentPilot] Received frame: $text")
-            val msg = runCatching { json.decodeFromString<AgentMessage>(text) }.getOrElse {
-                println("[AgentPilot] Failed to decode frame: ${it.message}")
-                null
-            }
-            if (msg is AgentMessage.ConnectionHandshake) {
-                println("[AgentPilot] Handshake complete, version=${msg.version}")
-                _state.value = ConnectionState.Connected(msg.version)
-                return
-            }
-        }
-        println("[AgentPilot] Handshake loop ended without success")
     }
 
+    /**
+     * Processes every incoming frame.
+     *
+     * The first [AgentMessage.ConnectionHandshake] transitions the state to Connected.
+     * Every other message is forwarded to [_messages] so [ConnectionViewModel] can react.
+     *
+     * Previously, a separate `performHandshake()` loop consumed frames while waiting for the
+     * handshake echo and silently discarded non-handshake frames (e.g. a clarification_request
+     * that arrived during connection setup). Merging everything into one loop fixes that.
+     */
     private suspend fun DefaultClientWebSocketSession.receiveLoop() {
         for (frame in incoming) {
             if (frame !is Frame.Text) continue
-            runCatching { json.decodeFromString<AgentMessage>(frame.readText()) }
-                .onSuccess { _messages.emit(it) }
+            val text = frame.readText()
+            val msg = runCatching { json.decodeFromString<AgentMessage>(text) }.getOrNull()
+            if (msg == null) {
+                println("[AgentPilot] Failed to decode frame: $text")
+                continue
+            }
+            if (msg is AgentMessage.ConnectionHandshake && _state.value !is ConnectionState.Connected) {
+                println("[AgentPilot] Handshake complete, version=${msg.version}")
+                _state.value = ConnectionState.Connected(msg.version)
+            } else {
+                _messages.emit(msg)
+            }
         }
         // Incoming channel closed = server dropped the connection; let the retry loop handle it
         activeSession = null
