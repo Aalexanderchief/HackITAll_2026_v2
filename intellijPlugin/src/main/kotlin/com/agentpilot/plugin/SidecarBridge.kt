@@ -24,6 +24,8 @@ object SidecarBridge {
     private val pendingApprovals = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
     private val pendingVerdicts   = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
     private val notificationService = NotificationService()
+    // Deduplication for safe (auto-approved) tools — prevents flooding the IDE with keypresses.
+    private val activeToolCalls = ConcurrentHashMap<String, String>()
 
     // Tools that write files — shown as CodeChangeProposal (diff) on mobile
     private val fileWriteTools = setOf(
@@ -96,6 +98,7 @@ object SidecarBridge {
                     break
                 } catch (e: Exception) {
                     System.err.println("[AgentPilot] Sidecar bridge lost: ${e.message}, retry in ${backoffMs}ms")
+                    activeToolCalls.clear()
                     delay(backoffMs)
                     backoffMs = (backoffMs * 2).coerceAtMost(30_000L)
                 }
@@ -176,6 +179,10 @@ object SidecarBridge {
 
             // Read-only tools — auto-approve, no mobile notification needed
             if (!requiresApproval(toolName)) {
+                val toolKey = "$endpoint:$content"
+                if (activeToolCalls.containsKey(toolKey)) return
+                activeToolCalls[toolKey] = "SAFE"
+                scope.launch { delay(2_000); activeToolCalls.remove(toolKey) }
                 acceptCurrentDialog()
                 WebSocketServer.broadcastAgentStatus("mcp-agent", "RUNNING", toolName)
                 return
