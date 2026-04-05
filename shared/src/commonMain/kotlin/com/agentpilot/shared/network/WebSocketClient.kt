@@ -48,8 +48,8 @@ class WebSocketClient {
     private val _messages = MutableSharedFlow<AgentMessage>()
     val messages: SharedFlow<AgentMessage> = _messages.asSharedFlow()
 
-    private var activeSession: DefaultClientWebSocketSession? = null
-    private var connectJob: Job? = null
+    @Volatile private var activeSession: DefaultClientWebSocketSession? = null
+    @Volatile private var connectJob: Job? = null
 
     /**
      * Connects to [url] (e.g. "ws://192.168.1.5:27042") and keeps the connection alive

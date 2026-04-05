@@ -7,10 +7,10 @@ plugins {
 }
 
 kotlin {
-    jvmToolchain(17)   // Android/ART bytecode ceiling — keep at 17 regardless of host JDK
+    jvmToolchain(17)
 
     androidTarget()
-    jvm()
+    jvm("desktop")
 
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
@@ -24,6 +24,10 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)
 
+            // Navigation + ViewModel (JetBrains multiplatform forks)
+            implementation(libs.navigation.compose)
+            implementation(libs.lifecycle.viewmodel.compose)
+
             // Networking
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.websockets)
@@ -35,7 +39,7 @@ kotlin {
             implementation(libs.coroutines.core)
             implementation(libs.serialization.json)
 
-            // Date/time (Instant used in LlmRequestCapture)
+            // Date/time
             implementation(libs.datetime)
 
             // MCP
@@ -43,7 +47,7 @@ kotlin {
         }
 
         androidMain.dependencies {
-            implementation(libs.ktor.client.okhttp)      // Android HTTP engine
+            implementation(libs.ktor.client.okhttp)
             implementation(libs.coroutines.android)
 
             // QR code scanning
@@ -53,6 +57,14 @@ kotlin {
             implementation(libs.mlkit.barcode)
             implementation(libs.activity.compose)
             implementation(libs.lifecycle.runtime.compose)
+        }
+
+        val desktopMain by getting {
+            dependencies {
+                implementation(libs.ktor.client.cio)
+                implementation(compose.desktop.currentOs)
+                implementation(libs.coroutines.swing)
+            }
         }
     }
 }

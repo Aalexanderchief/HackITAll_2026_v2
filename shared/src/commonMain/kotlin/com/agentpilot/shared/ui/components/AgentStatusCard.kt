@@ -1,4 +1,4 @@
-package com.agentpilot.android.ui.components
+package com.agentpilot.shared.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,14 +12,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.agentpilot.android.ui.theme.*
 import com.agentpilot.shared.models.AgentMessage
 import com.agentpilot.shared.models.AgentStatus
+import com.agentpilot.shared.ui.theme.*
 
-/**
- * Card component displaying agent status information.
- * Shows agent ID, status badge, progress bar, and current task.
- */
 @Composable
 fun AgentStatusCard(
     agentUpdate: AgentMessage.AgentStatusUpdate,
@@ -31,16 +27,13 @@ fun AgentStatusCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Header: Agent ID + Status Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -51,13 +44,11 @@ fun AgentStatusCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-
                 StatusBadge(status = agentUpdate.status)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Progress Bar
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -74,22 +65,19 @@ fun AgentStatusCard(
                         fontWeight = FontWeight.Medium
                     )
                 }
-
                 Spacer(modifier = Modifier.height(4.dp))
-
                 LinearProgressIndicator(
                     progress = { agentUpdate.progress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(8.dp)
                         .clip(RoundedCornerShape(4.dp)),
-                    color = getStatusColor(agentUpdate.status),
+                    color = statusColor(agentUpdate.status),
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Current Task
             Text(
                 text = agentUpdate.currentTask,
                 style = MaterialTheme.typography.bodyMedium,
@@ -99,61 +87,29 @@ fun AgentStatusCard(
     }
 }
 
-/**
- * Status badge chip showing agent status with appropriate color.
- */
 @Composable
-fun StatusBadge(
-    status: AgentStatus,
-    modifier: Modifier = Modifier
-) {
-    val (backgroundColor, textColor) = getStatusColors(status)
-
+fun StatusBadge(status: AgentStatus, modifier: Modifier = Modifier) {
+    val fg = statusColor(status)
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        color = backgroundColor
+        color = fg.copy(alpha = 0.2f)
     ) {
         Text(
             text = status.name.replace('_', ' '),
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             style = MaterialTheme.typography.labelSmall,
-            color = textColor,
+            color = fg,
             fontWeight = FontWeight.Medium
         )
     }
 }
 
-/**
- * Returns the primary color for a given agent status.
- */
-@Composable
-private fun getStatusColor(status: AgentStatus): Color {
-    return when (status) {
-        AgentStatus.IDLE -> StatusIdle
-        AgentStatus.RUNNING -> StatusRunning
-        AgentStatus.WAITING_FOR_INPUT -> StatusWaitingInput
-        AgentStatus.WAITING_FOR_REVIEW -> StatusWaitingReview
-        AgentStatus.COMPLETED -> StatusCompleted
-        AgentStatus.FAILED -> StatusFailed
-    }
-}
-
-/**
- * Returns background and text colors for status badges.
- */
-@Composable
-private fun getStatusColors(status: AgentStatus): Pair<Color, Color> {
-    val bgColor = when (status) {
-        AgentStatus.IDLE -> StatusIdle.copy(alpha = 0.2f)
-        AgentStatus.RUNNING -> StatusRunning.copy(alpha = 0.2f)
-        AgentStatus.WAITING_FOR_INPUT -> StatusWaitingInput.copy(alpha = 0.2f)
-        AgentStatus.WAITING_FOR_REVIEW -> StatusWaitingReview.copy(alpha = 0.2f)
-        AgentStatus.COMPLETED -> StatusCompleted.copy(alpha = 0.2f)
-        AgentStatus.FAILED -> StatusFailed.copy(alpha = 0.2f)
-    }
-
-    val textColor = getStatusColor(status)
-
-    return Pair(bgColor, textColor)
+fun statusColor(status: AgentStatus): Color = when (status) {
+    AgentStatus.IDLE -> StatusIdle
+    AgentStatus.RUNNING -> StatusRunning
+    AgentStatus.WAITING_FOR_INPUT -> StatusWaitingInput
+    AgentStatus.WAITING_FOR_REVIEW -> StatusWaitingReview
+    AgentStatus.COMPLETED -> StatusCompleted
+    AgentStatus.FAILED -> StatusFailed
 }

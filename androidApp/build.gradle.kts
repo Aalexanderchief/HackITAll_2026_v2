@@ -6,7 +6,7 @@ plugins {
 }
 
 kotlin {
-    jvmToolchain(17)   // Android/ART bytecode ceiling — keep at 17 regardless of host JDK
+    jvmToolchain(17)
 
     androidTarget()
     sourceSets {
@@ -22,11 +22,7 @@ kotlin {
             implementation(compose.uiTooling)
             implementation(compose.preview)
 
-            // Navigation
-            implementation(libs.navigation.compose)
-
             // Lifecycle
-            implementation(libs.lifecycle.viewmodel.compose)
             implementation(libs.lifecycle.runtime.compose)
 
             // Coroutines
