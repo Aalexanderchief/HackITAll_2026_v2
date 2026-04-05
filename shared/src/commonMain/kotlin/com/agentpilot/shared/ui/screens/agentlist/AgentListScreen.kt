@@ -1,4 +1,4 @@
-package com.agentpilot.android.ui.screens.agentlist
+package com.agentpilot.shared.ui.screens.agentlist
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -13,24 +13,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.agentpilot.android.ui.components.AgentStatusCard
+import com.agentpilot.shared.models.AgentMessage
 import com.agentpilot.shared.models.AgentStatus
 import com.agentpilot.shared.network.ConnectionState
+import com.agentpilot.shared.network.DiscoveryState
+import com.agentpilot.shared.ui.components.AgentStatusCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgentListScreen(
     onAgentClick: (String) -> Unit,
-    viewModel: AgentListViewModel = viewModel()
+    viewModel: AgentListViewModel = viewModel { AgentListViewModel() }
 ) {
     val agents by viewModel.filteredAgents.collectAsState()
     val filterStatus by viewModel.filterStatus.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
+    val discoveryState by viewModel.discoveryState.collectAsState()
     val activeClarification by viewModel.activeClarification.collectAsState()
     val activeCodeReview by viewModel.activeCodeReview.collectAsState()
 
-    // Show only one dialog at a time: code review takes priority over command approval.
-    // This prevents stacking when an agent runs a command immediately after a file write.
     if (activeCodeReview != null) {
         val proposal = activeCodeReview!!
         CodeReviewSheet(
@@ -50,9 +51,7 @@ fun AgentListScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("AgentPilot") })
-        }
+        topBar = { TopAppBar(title = { Text("AgentPilot") }) }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -61,7 +60,8 @@ fun AgentListScreen(
         ) {
             ConnectRow(
                 connectionState = connectionState,
-                onConnect    = { input -> viewModel.connect(input) },
+                discoveryState = discoveryState,
+                onConnect = { input -> viewModel.connect(input) },
                 onDisconnect = { viewModel.disconnect() }
             )
 
@@ -103,10 +103,11 @@ fun AgentListScreen(
 @Composable
 private fun ConnectRow(
     connectionState: ConnectionState,
+    discoveryState: DiscoveryState,
     onConnect: (String) -> Unit,
     onDisconnect: () -> Unit
 ) {
-    var ip by remember { mutableStateOf("10.0.2.2") }
+    var ip by remember { mutableStateOf("") }
     val isConnected = connectionState is ConnectionState.Connected
     val isConnecting = connectionState is ConnectionState.Connecting
     val isFailed = connectionState is ConnectionState.Failed
@@ -145,20 +146,32 @@ private fun ConnectRow(
             }
         }
 
-        if (isFailed) {
-            val errorMsg = (connectionState as ConnectionState.Failed).cause.message ?: "Unknown error"
-            Text(
-                text = "Error: $errorMsg",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFFF5722),
-                modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 4.dp)
-            )
-        }
-        if (isConnected) {
-            Text(
-                text = "Connected to ${(connectionState as ConnectionState.Connected).peerVersion}",
+        when {
+            isFailed -> {
+                val msg = (connectionState as ConnectionState.Failed).cause.message ?: "Unknown error"
+                Text(
+                    text = "Connection failed: $msg",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFFF5722),
+                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 4.dp)
+                )
+            }
+            isConnected -> Text(
+                text = "Connected · v${(connectionState as ConnectionState.Connected).peerVersion}",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFF4CAF50),
+                modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 4.dp)
+            )
+            discoveryState is DiscoveryState.Searching -> Text(
+                text = "Searching...",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFFFC107),
+                modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 4.dp)
+            )
+            discoveryState is DiscoveryState.NotFound -> Text(
+                text = "No device found — check the IP and try again.",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFFF5722),
                 modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 4.dp)
             )
         }
@@ -200,38 +213,32 @@ private fun ApprovalDialog(
     AlertDialog(
         onDismissRequest = onReject,
         title = { Text(toolName, style = MaterialTheme.typography.titleMedium) },
-        text  = {
+        text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Claude Code wants to run:", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "Claude Code wants to run:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Text(context, style = MaterialTheme.typography.bodyMedium)
             }
         },
-        confirmButton = {
-            Button(onClick = onApprove) { Text("Approve") }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onReject) { Text("Reject") }
-        }
+        confirmButton = { Button(onClick = onApprove) { Text("Approve") } },
+        dismissButton = { OutlinedButton(onClick = onReject) { Text("Reject") } }
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CodeReviewSheet(
-    proposal: com.agentpilot.shared.models.AgentMessage.CodeChangeProposal,
+    proposal: AgentMessage.CodeChangeProposal,
     onAccept: () -> Unit,
     onReject: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // New-file proposals have only additions — no prior content to reject.
-    // Modifications have deletions (red lines) and need explicit Accept/Reject.
     val isNewFile = proposal.explanation.startsWith("New file:")
 
-    ModalBottomSheet(
-        onDismissRequest = onReject,
-        sheetState = sheetState
-    ) {
+    ModalBottomSheet(onDismissRequest = onReject, sheetState = sheetState) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -239,12 +246,9 @@ private fun CodeReviewSheet(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Text(proposal.explanation, style = MaterialTheme.typography.titleMedium)
             Text(
-                text = proposal.explanation,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = proposal.filePath,
+                proposal.filePath,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -284,25 +288,14 @@ private fun CodeReviewSheet(
             HorizontalDivider()
 
             if (isNewFile) {
-                // New file: informational only — nothing to reject.
-                Button(
-                    onClick = onAccept,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("OK") }
+                Button(onClick = onAccept, modifier = Modifier.fillMaxWidth()) { Text("OK") }
             } else {
-                // Modification: show diff of what changes — user decides.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = onReject,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Reject") }
-                    Button(
-                        onClick = onAccept,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Accept") }
+                    OutlinedButton(onClick = onReject, modifier = Modifier.weight(1f)) { Text("Reject") }
+                    Button(onClick = onAccept, modifier = Modifier.weight(1f)) { Text("Accept") }
                 }
             }
         }
@@ -317,13 +310,13 @@ private fun EmptyAgentList(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "No agents found",
+                "No agents found",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Connect to IntelliJ and trigger an AI action",
+                "Connect to IntelliJ and trigger an AI action",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

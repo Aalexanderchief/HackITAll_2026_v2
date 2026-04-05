@@ -1,26 +1,24 @@
-package com.agentpilot.android.ui.screens.agentlist
+package com.agentpilot.shared.ui.screens.agentlist
 
-import android.content.Context
-import android.net.wifi.WifiManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.agentpilot.android.AgentPilotApplication
+import com.agentpilot.shared.AppState
 import com.agentpilot.shared.models.AgentMessage
 import com.agentpilot.shared.models.AgentStatus
 import com.agentpilot.shared.models.ChangeAction
 import com.agentpilot.shared.models.InputSource
 import com.agentpilot.shared.network.ConnectionState
+import com.agentpilot.shared.network.DiscoveryState
+import com.agentpilot.shared.platform.wifiBroadcastAddress
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.net.InetAddress
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 class AgentListViewModel : ViewModel() {
 
-    private val connectionViewModel = AgentPilotApplication.connectionViewModel
+    private val connectionViewModel = AppState.connectionViewModel
 
     val connectionState: StateFlow<ConnectionState> = connectionViewModel.connectionState
+    val discoveryState: StateFlow<DiscoveryState> = connectionViewModel.discoveryState
 
     private val _filterStatus = MutableStateFlow<AgentStatus?>(null)
     val filterStatus: StateFlow<AgentStatus?> = _filterStatus.asStateFlow()
@@ -50,38 +48,22 @@ class AgentListViewModel : ViewModel() {
     val activeCodeReview: StateFlow<AgentMessage.CodeChangeProposal?> =
         connectionViewModel.activeCodeReview
 
-    fun connectViaIp(ip: String) = connectionViewModel.connectViaIp(ip)
-    
+    /**
+     * Unified connect: auto-detects JB-token vs plain IP.
+     * JB-xxx tokens trigger UDP broadcast discovery; IP strings connect directly.
+     */
     fun connect(input: String) {
         val trimmed = input.trim()
         if (trimmed.startsWith("JB-", ignoreCase = true)) {
-            val broadcastAddress = wifiBroadcastAddress()
-            connectionViewModel.connectViaCode(trimmed.uppercase(), broadcastAddress)
+            connectionViewModel.connectViaCode(trimmed.uppercase(), wifiBroadcastAddress())
         } else {
             connectionViewModel.connectViaIp(trimmed)
-        }
-    }
-
-    private fun wifiBroadcastAddress(): String {
-        return try {
-            val wifi = AgentPilotApplication.instance
-                .getSystemService(Context.WIFI_SERVICE) as WifiManager
-            val dhcp = wifi.dhcpInfo
-            val broadcast = (dhcp.ipAddress and dhcp.netmask) or dhcp.netmask.inv()
-            val bytes = ByteBuffer.allocate(4)
-                .order(ByteOrder.LITTLE_ENDIAN)
-                .putInt(broadcast)
-                .array()
-            InetAddress.getByAddress(bytes).hostAddress ?: "255.255.255.255"
-        } catch (e: Exception) {
-            "255.255.255.255"
         }
     }
 
     fun disconnect() = connectionViewModel.disconnect()
 
     fun setFilter(status: AgentStatus?) { _filterStatus.value = status }
-
     fun clearFilter() { _filterStatus.value = null }
 
     fun respondToClarification(id: String, approved: Boolean) {
@@ -106,10 +88,5 @@ class AgentListViewModel : ViewModel() {
                 )
             )
         }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        connectionViewModel.onCleared()
     }
 }

@@ -1,8 +1,5 @@
-package com.agentpilot.android.ui
+package com.agentpilot.shared.ui
 
-/**
- * Navigation routes for the app.
- */
 object Routes {
     const val AGENT_LIST = "agent_list"
     const val AGENT_DETAIL = "agent_detail/{agentId}"

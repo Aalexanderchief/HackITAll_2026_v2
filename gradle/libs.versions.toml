@@ -13,8 +13,8 @@ activity-compose = "1.9.3"
 lifecycle-runtime-compose = "2.8.5"
 zxing = "3.5.3"
 intellij-platform = "2.3.0"
-navigation-compose = "2.8.5"
-lifecycle = "2.8.7"
+navigation-compose = "2.9.2"
+lifecycle = "2.10.0"
 
 [libraries]
 # Ktor
@@ -28,6 +28,7 @@ ktor-network                = { module = "io.ktor:ktor-network",                
 # Coroutines
 coroutines-core    = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",    version.ref = "coroutines" }
 coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+coroutines-swing   = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing",   version.ref = "coroutines" }
 
 # Serialization
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
@@ -51,11 +52,14 @@ ktor-server-content-neg  = { module = "io.ktor:ktor-server-content-negotiation",
 # QR code
 zxing-core   = { module = "com.google.zxing:core",     version.ref = "zxing" }
 zxing-javase = { module = "com.google.zxing:javase",   version.ref = "zxing" }
-# Navigation
-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
+# Navigation (JetBrains multiplatform fork — same package names, works on Android + Desktop)
+navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
 
-# Lifecycle
-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+# Lifecycle (JetBrains multiplatform fork — same package names, works on Android + Desktop)
+lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+
+# Ktor CIO engine (JVM/Desktop)
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 
 [plugins]
 kotlin-multiplatform  = { id = "org.jetbrains.kotlin.multiplatform",          version.ref = "kotlin" }
