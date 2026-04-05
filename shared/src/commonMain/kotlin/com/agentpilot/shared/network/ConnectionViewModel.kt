@@ -1,14 +1,22 @@
 package com.agentpilot.shared.network
 
 import com.agentpilot.shared.models.AgentMessage
+import com.agentpilot.shared.models.AgentStatus
+import com.agentpilot.shared.platform.NotificationService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -24,10 +32,12 @@ private const val ACTIVITY_FEED_LIMIT = 50
  * Lifecycle: call [onCleared] from the host ViewModel's onCleared() or equivalent.
  * Must be held at a scope that survives recomposition (Application singleton or Android ViewModel wrapper).
  */
+@OptIn(FlowPreview::class)
 class ConnectionViewModel {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val client = WebSocketClient()
+    private val notificationService = NotificationService()
 
     // --- Connection state ---
 
@@ -47,9 +57,13 @@ class ConnectionViewModel {
      * Latest known status for each agent, keyed by agentId.
      * Updated whenever an [AgentMessage.AgentStatusUpdate] arrives.
      * Suitable for driving an agent list screen — collect as state and render the map values.
+     * 
+     * Throttled to 200ms to prevent UI jank during rapid progress updates.
      */
     private val _agentStatuses = MutableStateFlow<Map<String, AgentMessage.AgentStatusUpdate>>(emptyMap())
-    val agentStatuses: StateFlow<Map<String, AgentMessage.AgentStatusUpdate>> = _agentStatuses.asStateFlow()
+    val agentStatuses: StateFlow<Map<String, AgentMessage.AgentStatusUpdate>> = _agentStatuses
+        .sample(200)
+        .stateIn(scope, SharingStarted.Eagerly, emptyMap())
 
     /**
      * The current pending clarification request from the agent, or null if none.
@@ -72,6 +86,8 @@ class ConnectionViewModel {
     /**
      * Chronological feed of the last [ACTIVITY_FEED_LIMIT] messages received.
      * Suitable for the main agent detail screen. New messages are appended at the end.
+     * 
+     * Excludes LlmResponseChunks to avoid overwhelming the list with streaming tokens.
      */
     private val _activityFeed = MutableStateFlow<List<AgentMessage>>(emptyList())
     val activityFeed: StateFlow<List<AgentMessage>> = _activityFeed.asStateFlow()
@@ -79,20 +95,56 @@ class ConnectionViewModel {
     init {
         scope.launch {
             client.messages.collect { message ->
+                // Process for state flows
                 when (message) {
-                    is AgentMessage.AgentStatusUpdate ->
-                        _agentStatuses.update { it + (message.agentId to message) }
+                    is AgentMessage.AgentStatusUpdate -> {
+                        val previousStatus = _agentStatuses.value[message.agentId]?.status
+                        _agentStatuses.update { current ->
+                            val next = current.toMutableMap()
+                            next[message.agentId] = message
+                            next
+                        }
+                        
+                        // Only notify on failure if we were actually running/waiting (not just initial sync or manual rejection)
+                        if (message.status == AgentStatus.FAILED && 
+                            previousStatus != null && 
+                            previousStatus != AgentStatus.IDLE && 
+                            previousStatus != AgentStatus.FAILED) {
+                            
+                            notificationService.notify(
+                                title = "Agent Failed",
+                                message = "Agent ${message.agentId} encountered an error: ${message.currentTask}"
+                            )
+                            notificationService.vibrate()
+                        }
+                    }
 
-                    is AgentMessage.ClarificationRequest ->
+                    is AgentMessage.ClarificationRequest -> {
                         _activeClarification.value = message
+                        notificationService.notify(
+                            title = "Input Needed",
+                            message = message.question
+                        )
+                        notificationService.vibrate()
+                    }
 
-                    is AgentMessage.CodeChangeProposal ->
+                    is AgentMessage.CodeChangeProposal -> {
                         _activeCodeReview.value = message
+                        notificationService.notify(
+                            title = "Review Pending",
+                            message = "New code change proposed for ${message.filePath}"
+                        )
+                        notificationService.vibrate()
+                    }
 
                     else -> Unit
                 }
-                _activityFeed.update { current ->
-                    (current + message).takeLast(ACTIVITY_FEED_LIMIT)
+                
+                // Add to activity feed only if it's not a streaming token chunk
+                if (message !is AgentMessage.LlmResponseChunk) {
+                    _activityFeed.update { current ->
+                        (current + message).takeLast(ACTIVITY_FEED_LIMIT)
+                    }
                 }
             }
         }

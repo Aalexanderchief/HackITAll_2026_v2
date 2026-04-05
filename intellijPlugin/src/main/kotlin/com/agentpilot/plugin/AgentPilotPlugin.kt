@@ -14,5 +14,6 @@ class AgentPilotPlugin : ProjectManagerListener {
 
     override fun projectClosing(project: Project) {
         WebSocketServer.stop()
+        SidecarBridge.stop()
     }
 }
