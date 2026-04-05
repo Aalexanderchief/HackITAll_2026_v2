@@ -17,6 +17,7 @@ import com.agentpilot.shared.models.AgentMessage
 import com.agentpilot.shared.models.AgentStatus
 import com.agentpilot.shared.network.ConnectionState
 import com.agentpilot.shared.network.DiscoveryState
+import com.agentpilot.shared.platform.NotificationPermissionRequest
 import com.agentpilot.shared.ui.components.AgentStatusCard
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +32,8 @@ fun AgentListScreen(
     val discoveryState by viewModel.discoveryState.collectAsState()
     val activeClarification by viewModel.activeClarification.collectAsState()
     val activeCodeReview by viewModel.activeCodeReview.collectAsState()
+
+    NotificationPermissionRequest()
 
     if (activeCodeReview != null) {
         val proposal = activeCodeReview!!
