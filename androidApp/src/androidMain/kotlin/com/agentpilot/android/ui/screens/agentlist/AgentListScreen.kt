@@ -1,5 +1,7 @@
 package com.agentpilot.android.ui.screens.agentlist
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -9,7 +11,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.agentpilot.android.ui.components.AgentStatusCard
 import com.agentpilot.shared.models.AgentStatus
@@ -21,10 +25,26 @@ fun AgentListScreen(
     onAgentClick: (String) -> Unit,
     viewModel: AgentListViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val agents by viewModel.filteredAgents.collectAsState()
     val filterStatus by viewModel.filterStatus.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
     val activeClarification by viewModel.activeClarification.collectAsState()
+
+    // Request notification permission on Android 13+
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        val launcher = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { /* ignored */ }
+        
+        LaunchedEffect(Unit) {
+            val permission = android.Manifest.permission.POST_NOTIFICATIONS
+            if (ContextCompat.checkSelfPermission(context, permission) != 
+                android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                launcher.launch(permission)
+            }
+        }
+    }
 
     activeClarification?.let { request ->
         ApprovalDialog(

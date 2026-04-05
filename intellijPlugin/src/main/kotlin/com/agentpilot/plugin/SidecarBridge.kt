@@ -1,5 +1,6 @@
 package com.agentpilot.plugin
 
+import com.agentpilot.plugin.platform.NotificationService
 import com.intellij.openapi.application.ApplicationManager
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
@@ -19,6 +20,7 @@ object SidecarBridge {
 
     private var bridgeScope: CoroutineScope? = null
     private val pendingApprovals = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
+    private val notificationService = NotificationService()
 
     // Captured button refs — populated by AWT listener the moment the dialog appears
     @Volatile private var capturedOk: javax.swing.AbstractButton? = null
@@ -80,6 +82,15 @@ object SidecarBridge {
                 }
             }
         }
+    }
+
+    fun stop() {
+        java.awt.Toolkit.getDefaultToolkit().removeAWTEventListener(awtListener)
+        pendingApprovals.values.forEach { it.cancel() }
+        pendingApprovals.clear()
+        capturedOk = null
+        capturedCancel = null
+        awaitingApproval = false
     }
 
     /** Called by WebSocketServer when a clarification_response arrives from the mobile app. */
@@ -162,6 +173,10 @@ object SidecarBridge {
             pendingApprovals[requestId] = deferred
             awaitingApproval = true  // AWT listener now captures the approval dialog buttons
 
+            // Local desktop notification
+            notificationService.notify("Approval Required", "Agent wants to run $toolName")
+            notificationService.vibrate()
+
             // Notify mobile — status WAITING_FOR_INPUT + clarification dialog
             WebSocketServer.broadcastAgentStatus("mcp-agent", "WAITING_FOR_INPUT", "$toolName: $detail")
             WebSocketServer.broadcastClarificationRequest(
@@ -185,7 +200,7 @@ object SidecarBridge {
                     WebSocketServer.broadcastAgentStatus("mcp-agent", "RUNNING", "Approved: $toolName")
                 } else {
                     rejectCurrentDialog()
-                    WebSocketServer.broadcastAgentStatus("mcp-agent", "FAILED", "Rejected: $toolName")
+                    WebSocketServer.broadcastAgentStatus("mcp-agent", "IDLE", "Rejected: $toolName")
                 }
             }
         } catch (e: Exception) {
